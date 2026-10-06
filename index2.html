@@ -1,0 +1,1308 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#1b5e20" />
+  <title>老黄历</title>
+  <link rel="icon" href="data:," />
+  <script src="./lunar.js" onerror="window.__lunarFailed=true"></script>
+  <link rel="stylesheet" href="./remixicon.css" />
+  <style>
+    /* ===== Fonts ===== */
+    @font-face { font-family: "ShengXiao"; src: url("shengxiao.ttf") format("truetype"); font-display: swap; }
+    @font-face { font-family: "ShengXiao1"; src: url("shengxiao1.ttf") format("truetype"); font-display: swap; }
+    @font-face { font-family: "FZXingKai-S04S"; src: url("./FZXingKai-S04S.woff2") format("woff2"); font-display: swap; }
+    @font-face { font-family: "STHupo"; src: url("./STHupo.woff2") format("woff2"); font-display: swap; }
+
+    /* ===== CSS Variables ===== */
+    :root {
+      --c-primary: #1b5e20;
+      --c-primary-light: rgba(27,94,32,0.35);
+      --c-primary-tint: rgba(27,94,32,0.08);
+      --c-primary-muted: #4d7c50;
+      --c-red: #c62828;
+      --c-red-light: rgba(198,40,40,0.35);
+      --c-red-tint: rgba(198,40,40,0.08);
+      --c-bg: #f5f4ef;
+      --c-card: #fdfcf7;
+      --c-text: #2c2c2c;
+      --c-text-secondary: #666;
+      --c-border: #e0ddd5;
+      --c-divider: #eae8e0;
+      --radius: 12px;
+      --radius-sm: 8px;
+      --shadow: 0 2px 12px rgba(0,0,0,0.06);
+      --transition: 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* ===== Reset ===== */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    html { font-size: 16px; scroll-behavior: smooth; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: var(--c-bg);
+      color: var(--c-text);
+      min-height: 100dvh;
+      overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+    button { font: inherit; cursor: pointer; border: none; background: none; color: inherit; }
+    [hidden] { display: none !important; }
+
+    /* ===== App Shell ===== */
+    .app {
+      max-width: 480px;
+      margin: 0 auto;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* ===== Top Bar ===== */
+    .top-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      background: var(--c-primary);
+      color: #fff;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      gap: 8px;
+    }
+    .top-bar.is-weekend { background: var(--c-red); }
+    .top-bar-title {
+      font-size: 17px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      white-space: nowrap;
+    }
+    .top-bar-btn {
+      width: 36px; height: 36px;
+      display: grid; place-items: center;
+      border-radius: 50%;
+      font-size: 18px;
+      transition: background 0.2s;
+      flex-shrink: 0;
+    }
+    .top-bar-btn:hover { background: rgba(255,255,255,0.15); }
+    .top-bar-btn:active { background: rgba(255,255,255,0.25); }
+
+    /* ===== Date Nav ===== */
+    .date-nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 12px;
+      background: var(--c-card);
+      border-bottom: 1px solid var(--c-divider);
+      user-select: none;
+    }
+    .date-nav-arrow {
+      width: 40px; height: 40px;
+      display: grid; place-items: center;
+      border-radius: 50%;
+      font-size: 20px;
+      color: var(--c-primary);
+      transition: all 0.2s;
+    }
+    .date-nav-arrow:active { transform: scale(0.9); background: var(--c-primary-tint); }
+    .date-nav-arrow:disabled { opacity: 0.3; pointer-events: none; }
+    .date-nav-center {
+      text-align: center;
+      flex: 1;
+      cursor: pointer;
+      padding: 4px 8px;
+      border-radius: var(--radius-sm);
+      transition: background 0.2s;
+    }
+    .date-nav-center:hover { background: var(--c-primary-tint); }
+    .date-nav-main {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--c-text);
+    }
+    .date-nav-sub {
+      font-size: 12px;
+      color: var(--c-text-secondary);
+      margin-top: 1px;
+    }
+
+    /* ===== Slide Container ===== */
+    .slide-container {
+      position: relative;
+      flex: 1;
+      overflow: hidden;
+    }
+    .slide-page {
+      position: absolute;
+      inset: 0;
+      overflow-y: auto;
+      overflow-x: hidden;
+      -webkit-overflow-scrolling: touch;
+      will-change: transform, opacity;
+      transition: transform var(--transition), opacity var(--transition);
+      background: var(--c-bg);
+    }
+    .slide-page.active { transform: translateX(0); opacity: 1; z-index: 2; }
+    .slide-page.left { transform: translateX(-100%); opacity: 0; z-index: 1; }
+    .slide-page.right { transform: translateX(100%); opacity: 0; z-index: 1; }
+    .slide-page.no-transition { transition: none !important; }
+
+    /* ===== Card Sections ===== */
+    .card-content { padding: 0 12px 24px; }
+
+    /* --- Hero Date Section --- */
+    .hero {
+      background: var(--c-card);
+      border-radius: var(--radius);
+      padding: 20px 16px 16px;
+      margin: 12px 0;
+      box-shadow: var(--shadow);
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+    .hero::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 4px;
+      background: var(--c-primary);
+    }
+    .hero.is-weekend::before { background: var(--c-red); }
+    .hero-day {
+      font-size: 64px;
+      font-weight: 800;
+      line-height: 1;
+      color: var(--c-primary);
+      font-family: "FZXingKai-S04S", "STHupo", serif;
+    }
+    .hero.is-weekend .hero-day { color: var(--c-red); }
+    .hero-weekday {
+      font-size: 16px;
+      font-weight: 600;
+      margin-top: 4px;
+      color: var(--c-text);
+    }
+    .hero-lunar {
+      font-size: 14px;
+      color: var(--c-text-secondary);
+      margin-top: 6px;
+      line-height: 1.5;
+    }
+    .hero-term {
+      display: inline-block;
+      margin-top: 6px;
+      padding: 2px 10px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      background: var(--c-primary-tint);
+      color: var(--c-primary);
+    }
+    .hero.is-weekend .hero-term { background: var(--c-red-tint); color: var(--c-red); }
+    .hero-en {
+      font-size: 11px;
+      color: #999;
+      margin-top: 4px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    /* --- Section Card --- */
+    .section {
+      background: var(--c-card);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      margin-bottom: 10px;
+      box-shadow: var(--shadow);
+    }
+    .section-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--c-primary);
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .section-title i { font-size: 15px; }
+    .is-weekend .section-title { color: var(--c-red); }
+
+    /* --- Yi / Ji --- */
+    .yiji-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .yiji-col {}
+    .yiji-label {
+      font-size: 12px;
+      font-weight: 700;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .yiji-label.yi { color: var(--c-primary); }
+    .yiji-label.ji { color: var(--c-red); }
+    .yiji-items {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+    .yiji-tag {
+      font-size: 12px;
+      padding: 2px 8px;
+      border-radius: 4px;
+      line-height: 1.5;
+    }
+    .yiji-tag.yi { background: var(--c-primary-tint); color: var(--c-primary); }
+    .yiji-tag.ji { background: var(--c-red-tint); color: var(--c-red); }
+
+    /* --- GanZhi / WuXing --- */
+    .gz-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      margin-bottom: 8px;
+      flex-wrap: wrap;
+    }
+    .gz-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 600;
+      background: var(--c-primary-tint);
+      color: var(--c-primary);
+    }
+    .gz-pill .el { font-size: 11px; opacity: 0.7; font-weight: 400; }
+    .gz-nayin {
+      text-align: center;
+      font-size: 12px;
+      color: var(--c-text-secondary);
+      margin-top: 2px;
+    }
+
+    /* --- Clash / Chong --- */
+    .clash-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--c-text-secondary);
+      flex-wrap: wrap;
+    }
+    .clash-animal {
+      font-family: "ShengXiao", "ShengXiao1", serif;
+      font-size: 20px;
+      color: var(--c-red);
+    }
+
+    /* --- Gods / Directions --- */
+    .gods-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 6px;
+      text-align: center;
+    }
+    .god-item {}
+    .god-name { font-size: 11px; color: var(--c-text-secondary); }
+    .god-dir { font-size: 13px; font-weight: 600; color: var(--c-text); margin-top: 2px; }
+
+    /* --- Bazi --- */
+    .bazi-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    .bazi-pill {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 6px 12px;
+      border-radius: var(--radius-sm);
+      background: var(--c-primary-tint);
+    }
+    .bazi-pill .label { font-size: 10px; color: var(--c-text-secondary); }
+    .bazi-pill .value { font-size: 15px; font-weight: 700; color: var(--c-primary); }
+
+    /* --- Feixing --- */
+    .feixing-wrap {
+      display: flex;
+      justify-content: center;
+      padding: 8px 0;
+    }
+    .feixing-wrap svg { width: 100%; max-width: 280px; height: auto; }
+
+    /* --- Zodiac Grid --- */
+    .zodiac-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 6px;
+    }
+    .zodiac-item {
+      text-align: center;
+      padding: 6px 2px;
+      border-radius: var(--radius-sm);
+      background: var(--c-primary-tint);
+    }
+    .zodiac-animal {
+      font-family: "ShengXiao", "ShengXiao1", serif;
+      font-size: 22px;
+      color: var(--c-primary);
+    }
+    .zodiac-nums {
+      font-size: 10px;
+      color: var(--c-text-secondary);
+      margin-top: 2px;
+      line-height: 1.3;
+    }
+
+    /* --- Lucky --- */
+    .lucky-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      font-size: 13px;
+    }
+    .lucky-label { color: var(--c-text-secondary); }
+    .lucky-value { font-weight: 600; color: var(--c-primary); }
+
+    /* --- Couplet --- */
+    .couplet-wrap {
+      display: flex;
+      justify-content: center;
+      gap: 16px;
+      padding: 8px 0;
+    }
+    .couplet-col {
+      writing-mode: vertical-rl;
+      font-family: "FZXingKai-S04S", "STHupo", serif;
+      font-size: 15px;
+      line-height: 2;
+      color: var(--c-primary);
+      letter-spacing: 2px;
+    }
+
+    /* --- Dream --- */
+    .dream-text {
+      font-size: 13px;
+      color: var(--c-text-secondary);
+      line-height: 1.6;
+      text-align: center;
+    }
+
+    /* --- Tide --- */
+    .tide-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      font-size: 13px;
+      color: var(--c-text-secondary);
+    }
+
+    /* --- Tai --- */
+    .tai-text {
+      text-align: center;
+      font-size: 13px;
+      color: var(--c-text-secondary);
+    }
+
+    /* --- Nine Star --- */
+    .nine-star {
+      text-align: center;
+      font-size: 13px;
+      color: var(--c-text-secondary);
+    }
+
+    /* ===== Date Picker Overlay ===== */
+    .picker-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 200;
+      background: rgba(0,0,0,0.4);
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s;
+    }
+    .picker-overlay.open { opacity: 1; pointer-events: auto; }
+    .picker-panel {
+      background: var(--c-card);
+      border-radius: 16px 16px 0 0;
+      padding: 20px;
+      width: 100%;
+      max-width: 480px;
+      transform: translateY(100%);
+      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .picker-overlay.open .picker-panel { transform: translateY(0); }
+    .picker-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+    .picker-header h3 { font-size: 16px; font-weight: 600; }
+    .picker-close {
+      width: 32px; height: 32px;
+      display: grid; place-items: center;
+      border-radius: 50%;
+      font-size: 18px;
+      color: var(--c-text-secondary);
+    }
+    .picker-close:hover { background: var(--c-primary-tint); }
+    .picker-body { display: flex; flex-direction: column; gap: 12px; }
+    .picker-row { display: flex; gap: 8px; align-items: center; }
+    .picker-label { font-size: 13px; color: var(--c-text-secondary); width: 36px; flex-shrink: 0; }
+    .picker-input {
+      flex: 1;
+      padding: 8px 12px;
+      border: 1px solid var(--c-border);
+      border-radius: var(--radius-sm);
+      font-size: 15px;
+      font-family: inherit;
+      background: var(--c-bg);
+      color: var(--c-text);
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .picker-input:focus { border-color: var(--c-primary); }
+    .picker-actions { display: flex; gap: 8px; margin-top: 12px; }
+    .picker-btn {
+      flex: 1;
+      padding: 10px;
+      border-radius: var(--radius-sm);
+      font-size: 14px;
+      font-weight: 600;
+      text-align: center;
+      transition: all 0.2s;
+    }
+    .picker-btn.primary { background: var(--c-primary); color: #fff; }
+    .picker-btn.primary:hover { filter: brightness(1.1); }
+    .picker-btn.secondary { background: var(--c-primary-tint); color: var(--c-primary); }
+
+    /* ===== Loading ===== */
+    .loading-mask {
+      position: fixed;
+      inset: 0;
+      z-index: 300;
+      background: var(--c-bg);
+      display: grid;
+      place-items: center;
+      transition: opacity 0.4s;
+    }
+    .loading-mask.hidden { opacity: 0; pointer-events: none; }
+    .loading-spinner {
+      width: 40px; height: 40px;
+      border: 3px solid var(--c-border);
+      border-top-color: var(--c-primary);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ===== Desktop Enhancement ===== */
+    @media (min-width: 768px) {
+      .app { max-width: 520px; }
+      .hero-day { font-size: 80px; }
+      .card-content { padding: 0 16px 32px; }
+      .zodiac-grid { grid-template-columns: repeat(6, 1fr); }
+      .gods-grid { grid-template-columns: repeat(4, 1fr); gap: 10px; }
+    }
+    @media (min-width: 1024px) {
+      .app { max-width: 560px; }
+    }
+
+    /* ===== Scrollbar ===== */
+    .slide-page::-webkit-scrollbar { width: 3px; }
+    .slide-page::-webkit-scrollbar-track { background: transparent; }
+    .slide-page::-webkit-scrollbar-thumb { background: var(--c-border); border-radius: 3px; }
+
+    /* ===== Reduced Motion ===== */
+    @media (prefers-reduced-motion: reduce) {
+      .slide-page { transition-duration: 0.01ms !important; }
+      .loading-spinner { animation: none; }
+    }
+  </style>
+</head>
+<body>
+  <!-- Loading -->
+  <div class="loading-mask" id="loading">
+    <div class="loading-spinner"></div>
+  </div>
+
+  <!-- App Shell -->
+  <div class="app" id="app">
+    <!-- Top Bar -->
+    <header class="top-bar" id="topBar">
+      <button class="top-bar-btn" id="btnToday" title="回到今天" aria-label="回到今天">
+        <i class="ri-calendar-line"></i>
+      </button>
+      <span class="top-bar-title">老黄历</span>
+      <button class="top-bar-btn" id="btnExport" title="导出" aria-label="导出">
+        <i class="ri-download-2-line"></i>
+      </button>
+    </header>
+
+    <!-- Date Navigation -->
+    <nav class="date-nav" id="dateNav">
+      <button class="date-nav-arrow" id="btnPrev" aria-label="前一天">
+        <i class="ri-arrow-left-s-line"></i>
+      </button>
+      <div class="date-nav-center" id="dateCenter" role="button" tabindex="0" aria-label="选择日期">
+        <div class="date-nav-main" id="dateMain"></div>
+        <div class="date-nav-sub" id="dateSub"></div>
+      </div>
+      <button class="date-nav-arrow" id="btnNext" aria-label="后一天">
+        <i class="ri-arrow-right-s-line"></i>
+      </button>
+    </nav>
+
+    <!-- Slide Container -->
+    <div class="slide-container" id="slideContainer">
+      <div class="slide-page right" id="pagePrev"></div>
+      <div class="slide-page active" id="pageCurrent"></div>
+      <div class="slide-page right" id="pageNext"></div>
+    </div>
+  </div>
+
+  <!-- Date Picker Overlay -->
+  <div class="picker-overlay" id="pickerOverlay">
+    <div class="picker-panel">
+      <div class="picker-header">
+        <h3>选择日期</h3>
+        <button class="picker-close" id="pickerClose"><i class="ri-close-line"></i></button>
+      </div>
+      <div class="picker-body">
+        <div class="picker-row">
+          <span class="picker-label">年份</span>
+          <input type="number" class="picker-input" id="pickerYear" min="1900" max="2099" />
+        </div>
+        <div class="picker-row">
+          <span class="picker-label">月份</span>
+          <input type="number" class="picker-input" id="pickerMonth" min="1" max="12" />
+        </div>
+        <div class="picker-row">
+          <span class="picker-label">日期</span>
+          <input type="number" class="picker-input" id="pickerDay" min="1" max="31" />
+        </div>
+        <div class="picker-actions">
+          <button class="picker-btn secondary" id="pickerToday">今天</button>
+          <button class="picker-btn primary" id="pickerGo">确定</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  (function() {
+    "use strict";
+
+    /* ===== Constants ===== */
+    const HAS_LUNAR = !window.__lunarFailed && !!window.Solar;
+    const EPOCH_DATE = "1900-01-01";
+    const FIRST_DATE = "1900-01-01";
+    const MAX_DATE = "2099-12-31";
+    const pad = (n) => String(n).padStart(2, "0");
+    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+    const BRANCHES = ['子','丑','寅','卯','辰','巳','午','未','申','酉','戌','亥'];
+    const ZODIACS = ['鼠','牛','虎','兔','龙','蛇','马','羊','猴','鸡','狗','猪'];
+    const SAN_HE = {0:[4,8],1:[5,9],2:[6,10],3:[7,11],4:[8,0],5:[9,1],6:[10,2],7:[11,3],8:[0,4],9:[1,5],10:[2,6],11:[3,7]};
+
+    const EN_MONTH = new Intl.DateTimeFormat("en-US", { month: "long", timeZone: "UTC" });
+    const EN_WEEKDAY = new Intl.DateTimeFormat("en-US", { weekday: "long", timeZone: "UTC" });
+    const utcDate = (y, m, d) => new Date(Date.UTC(y, m - 1, d));
+
+    const TIDE = {};
+    [
+      [1,"06:05","10:30"],[2,"06:30","11:00"],[3,"07:25","11:40"],[4,"07:50","12:20"],
+      [5,"08:30","13:00"],[6,"09:00","13:40"],[7,"09:40","14:30"],[8,"10:20","15:20"],
+      [9,"11:30","16:30"],[10,"12:20","17:40"],[11,"13:50","18:40"],[12,"15:00","19:30"],
+      [13,"04:10","08:20"],[14,"05:10","09:10"],[15,"05:50","09:50"]
+    ].forEach(r => { TIDE[r[0]] = [r[1], r[2]]; TIDE[r[0]+15] = [r[1], r[2]]; });
+
+    const FEIXING_CONST = {
+      FLY_ORDER: ["中","乾","兑","艮","离","坎","坤","震","巽"],
+      RING: ["坎","艮","震","巽","离","坤","兑","乾"],
+      R_OUTER: 254, R_INNER: 158, R_TAIJI: 60,
+      STROKE: { outer: 5, inner: 5, spoke: 5 },
+      FONT_SIZE: 60
+    };
+    FEIXING_CONST.HALF = Math.ceil(FEIXING_CONST.R_OUTER * Math.cos(Math.PI / 8) + FEIXING_CONST.STROKE.outer / 2);
+    FEIXING_CONST.VIEWBOX = `${-FEIXING_CONST.HALF} ${-FEIXING_CONST.HALF} ${FEIXING_CONST.HALF*2} ${FEIXING_CONST.HALF*2}`;
+
+    const COLORS = {
+      normal: { primary: "#1B5E20", light: "rgba(27,94,32,0.4)", tint: "rgba(27,94,32,0.1)" },
+      weekend: { primary: "#C62828", light: "rgba(198,40,40,0.4)", tint: "rgba(198,40,40,0.1)" }
+    };
+
+    /* ===== Date Utilities ===== */
+    function todayCN() {
+      try {
+        const p = new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Shanghai", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date());
+        const pick = t => (p.find(x => x.type === t) || { value: "1" }).value;
+        return `${pick("year")}-${pick("month")}-${pick("day")}`;
+      } catch(e) {
+        const d = new Date();
+        return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+      }
+    }
+    function shiftDate(dateStr, days) {
+      if (HAS_LUNAR) {
+        const a = dateStr.split("-");
+        return window.Solar.fromYmd(+a[0],+a[1],+a[2]).next(days).toYmd();
+      }
+      const d = new Date(dateStr);
+      d.setDate(d.getDate() + days);
+      return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+    }
+    function daysBetween(a, b) {
+      if (HAS_LUNAR) {
+        const x = a.split("-"), y = b.split("-");
+        return window.Solar.fromYmd(+x[0],+x[1],+x[2]).subtract(window.Solar.fromYmd(+y[0],+y[1],+y[2]));
+      }
+      return Math.round((new Date(a) - new Date(b)) / 86400000);
+    }
+    const serialOf = (dateStr) => daysBetween(dateStr, EPOCH_DATE);
+    const dateOf = (index) => shiftDate(FIRST_DATE, index);
+
+    const TODAY_DATE = (() => { const t = todayCN(); return t >= FIRST_DATE && t <= MAX_DATE ? t : FIRST_DATE; })();
+    const TODAY_INDEX = daysBetween(TODAY_DATE, FIRST_DATE);
+    const MIN_INDEX = 0;
+    const MAX_INDEX = daysBetween(MAX_DATE, FIRST_DATE);
+
+    /* ===== Daily Text ===== */
+    const DAILY_TEXT = {
+      couplet: { file: "couplets.json", items: [], fallback: ["好言一句三冬暖","话不投机六月寒"], normalize: x => (Array.isArray(x) && x.length >= 2 ? [String(x[0]).trim(), String(x[1]).trim()] : null) },
+      dream: { file: "jiemeng.json", items: [], fallback: "梦见: 登高望远, 主步步高升", normalize: x => { const s = Array.isArray(x) ? x[0] : x; return typeof s === "string" && s.trim() ? s.trim() : null; } }
+    };
+    async function loadDailyText() {
+      await Promise.all(Object.values(DAILY_TEXT).map(async src => {
+        try {
+          const res = await fetch(src.file);
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const raw = await res.json();
+          const items = (Array.isArray(raw) ? raw : []).map(src.normalize).filter(Boolean);
+          if (!items.length) throw new Error("empty");
+          src.items = items;
+        } catch(e) { console.warn(`[Calendar] 加载 ${src.file} 失败:`, e); }
+      }));
+    }
+    const cycledPick = (src, serial) => { const list = src.items.length ? src.items : [src.fallback]; return list[((serial % list.length) + list.length) % list.length]; };
+    const dailyText = (serial) => ({ couplet: cycledPick(DAILY_TEXT.couplet, serial), dream: cycledPick(DAILY_TEXT.dream, serial) });
+
+    /* ===== Holiday Couplets ===== */
+    const HOLIDAY_COUPLETS = { file: "holidays.json", map: Object.create(null) };
+    async function loadHolidayCouplets() {
+      try {
+        const res = await fetch(HOLIDAY_COUPLETS.file);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const raw = await res.json();
+        const map = Object.create(null);
+        Object.entries(raw && typeof raw === "object" ? raw : {}).forEach(([name, list]) => {
+          const items = (Array.isArray(list) ? list : []).map(x => (Array.isArray(x) && x.length >= 2 ? [String(x[0]).trim(), String(x[1]).trim()] : null)).filter(Boolean);
+          const key = String(name).trim();
+          if (key && items.length) map[key] = items;
+        });
+        if (!Object.keys(map).length) throw new Error("empty");
+        HOLIDAY_COUPLETS.map = map;
+      } catch(e) { console.warn(`[Calendar] 加载 ${HOLIDAY_COUPLETS.file} 失败:`, e); }
+    }
+    const SOLAR_FESTIVALS = {"01-01":["元旦"],"02-14":["情人节"],"03-08":["国际妇女节"],"03-12":["植树节"],"05-01":["国际劳动节"],"05-04":["五四青年节"],"06-01":["国际儿童节"],"07-01":["建党纪念日"],"08-01":["建军节"],"09-10":["教师节"],"10-01":["国庆节"],"12-25":["圣诞节"]};
+    const LUNAR_FESTIVALS = {"1-1":["春节"],"1-15":["元宵节"],"2-2":["龙抬头"],"5-5":["端午节"],"7-7":["七夕节"],"7-15":["中元节"],"8-15":["中秋节"],"9-9":["重阳节"],"12-8":["腊八节"],"12-23":["小年"]};
+    function festivalNamesOf(sol, lun) {
+      const names = [];
+      const sl = SOLAR_FESTIVALS[pad(sol.getMonth())+"-"+pad(sol.getDay())];
+      if (sl) names.push(...sl);
+      if (sol.getMonth()===5 && sol.getWeek()===0 && sol.getDay()>=8 && sol.getDay()<=14) names.push("母亲节");
+      if (sol.getMonth()===6 && sol.getWeek()===0 && sol.getDay()>=15 && sol.getDay()<=21) names.push("父亲节");
+      const ll = LUNAR_FESTIVALS[lun.getMonth()+"-"+lun.getDay()];
+      if (ll) names.push(...ll);
+      const nextLun = sol.next(1).getLunar();
+      if (nextLun.getMonth()===1 && nextLun.getDay()===1) names.push("除夕");
+      return names;
+    }
+    function holidayCoupletOf(sol, lun, termName) {
+      const map = HOLIDAY_COUPLETS.map;
+      const names = festivalNamesOf(sol, lun);
+      const candidates = [];
+      if (names.length) candidates.push(names.join("·"), ...names);
+      const term = termName ? String(termName).trim() : "";
+      if (term) candidates.unshift(term);
+      const yearDigit = sol.getYear() % 10;
+      for (const key of candidates) {
+        const list = map[key];
+        if (list && list.length) return list[yearDigit % list.length];
+      }
+      return null;
+    }
+
+    /* ===== Lucky Numbers ===== */
+    function getZodiacPool(zodiacIdx, yearBranchIdx) {
+      const base = (((yearBranchIdx - zodiacIdx) % 12) + 12) % 12 + 1;
+      const nums = [];
+      for (let n = base; n <= 49; n += 12) nums.push(pad(n));
+      return nums;
+    }
+    function selectWithMinGap(sortedPool, count = 6, minDiff = 5) {
+      const selected = [];
+      const nums = sortedPool.map(Number);
+      for (let i = 0; i < nums.length; i++) {
+        const current = nums[i];
+        const isLast = (i === nums.length - 1);
+        if (selected.length === 0) { selected.push(current); }
+        else {
+          const gap = current - selected[selected.length - 1];
+          if (gap >= minDiff || isLast) selected.push(current);
+        }
+        if (selected.length >= count) break;
+      }
+      if (selected.length < count) {
+        for (let i = nums.length - 1; i >= 0 && selected.length < count; i--) {
+          if (!selected.includes(nums[i])) selected.push(nums[i]);
+        }
+        selected.sort((a, b) => a - b);
+      }
+      return selected.map(pad);
+    }
+    function calculateLuckyNumbers(lun) {
+      const branchIdx = BRANCHES.indexOf(lun.getDayZhi());
+      const yearBranchIdx = BRANCHES.indexOf(lun.getYearZhiByLiChun());
+      const zodiacIndices = SAN_HE[branchIdx];
+      const fullPool = zodiacIndices.flatMap(idx => getZodiacPool(idx, yearBranchIdx)).sort((a,b) => Number(a)-Number(b));
+      return { zodiacs: zodiacIndices.map(idx => ZODIACS[idx]).join(""), numbers: selectWithMinGap(fullPool, 6, 5) };
+    }
+
+    /* ===== Year Feixing ===== */
+    function yearFeixing(lun) {
+      const center = lun.getYearNineStar().getIndex();
+      const dist = {};
+      FEIXING_CONST.FLY_ORDER.forEach((palace, step) => {
+        dist[palace] = window.NineStar.fromIndex((center + step) % 9);
+      });
+      return dist;
+    }
+
+    /* ===== Feixing SVG ===== */
+    function renderFeixingSVG(dist, color = "#1B5E20") {
+      const { R_OUTER, R_INNER, R_TAIJI, STROKE, FONT_SIZE, RING, VIEWBOX } = FEIXING_CONST;
+      const paper = "#fdfcf7";
+      const cosHalf = Math.cos(Math.PI / 8);
+      const yInner = ((R_TAIJI + R_INNER * cosHalf) / 2).toFixed(1);
+      const yOuter = ((R_INNER * cosHalf + R_OUTER * cosHalf) / 2).toFixed(1);
+      const octagon = r => {
+        const pts = [];
+        for (let i = 0; i < 8; i++) {
+          const a = ((22.5 + i * 45) * Math.PI) / 180;
+          pts.push(`${(Math.sin(a)*r).toFixed(2)},${(-Math.cos(a)*r).toFixed(2)}`);
+        }
+        return pts.join(" ");
+      };
+      let out = `<polygon points="${octagon(R_OUTER)}" fill="${paper}" stroke="${color}" stroke-width="${STROKE.outer}" stroke-linejoin="round"/>`;
+      out += `<polygon points="${octagon(R_INNER)}" fill="none" stroke="${color}" stroke-width="${STROKE.inner}"/>`;
+      for (let i = 0; i < 8; i++) {
+        const a = ((22.5 + i * 45) * Math.PI) / 180;
+        out += `<line x1="${(Math.sin(a)*R_TAIJI).toFixed(2)}" y1="${(-Math.cos(a)*R_TAIJI).toFixed(2)}" x2="${(Math.sin(a)*R_OUTER).toFixed(2)}" y2="${(-Math.cos(a)*R_OUTER).toFixed(2)}" stroke="${color}" stroke-width="${STROKE.spoke}"/>`;
+      }
+      out += `<circle cx="0" cy="0" r="${R_TAIJI}" fill="${paper}" stroke="${color}" stroke-width="${STROKE.inner}"/>`;
+      out += `<path d="M 0,-${R_TAIJI} A ${R_TAIJI},${R_TAIJI} 0 0,0 0,${R_TAIJI} A ${R_TAIJI/2},${R_TAIJI/2} 0 0,0 0,0 A ${R_TAIJI/2},${R_TAIJI/2} 0 0,1 0,-${R_TAIJI} Z" fill="${color}" stroke="none"/>`;
+      out += `<circle cx="0" cy="${-R_TAIJI/2}" r="${R_TAIJI/8}" fill="${color}" stroke="none"/>`;
+      out += `<circle cx="0" cy="${R_TAIJI/2}" r="${R_TAIJI/8}" fill="${paper}" stroke="none"/>`;
+      const text = (x, y, str) => `<text x="${x}" y="${y}" fill="${color}" stroke="none" font-size="${FONT_SIZE}" text-anchor="middle" dominant-baseline="central">${str}</text>`;
+      const half = FONT_SIZE / 2;
+      RING.forEach((palace, i) => {
+        const star = dist[palace];
+        out += `<g transform="rotate(${i*45-180})">`;
+        out += text(0, yInner, palace);
+        out += text(-half, yOuter, star.getNumber());
+        out += text(half, yOuter, star.getColor());
+        out += `</g>`;
+      });
+      return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${VIEWBOX}">${out}</svg>`;
+    }
+
+    /* ===== Almanac ===== */
+    const almanacCache = new Map();
+    function almanac(dateStr) {
+      if (!HAS_LUNAR) return null;
+      const hit = almanacCache.get(dateStr);
+      if (hit) return hit;
+      const { Solar, SolarUtil, LunarMonth, LunarUtil } = window;
+      const a = dateStr.split("-");
+      const sol = Solar.fromYmd(+a[0], +a[1], +a[2]);
+      const lun = sol.getLunar();
+      const mm = LunarMonth.fromYm(lun.getYear(), lun.getMonth());
+      const todayJq = lun.getCurrentJieQi();
+      const nt = todayJq || lun.getNextJieQi(true);
+      const ns = nt.getSolar(), nl = ns.getLunar();
+      const termDaysAway = ns.subtract(sol);
+      const termPrefix = ["今日","明日","后日"][termDaysAway] || nl.getDayInChinese();
+      const seasonalPeriod = lun.getFu() || lun.getShuJiu();
+      let seasonalLabel = "";
+      if (seasonalPeriod) {
+        const index = seasonalPeriod.getIndex();
+        const indexCN = index < 10 ? LunarUtil.NUMBER[index] : index === 10 ? "十" : index < 20 ? "十"+LunarUtil.NUMBER[index-10] : "二十";
+        seasonalLabel = `${seasonalPeriod.getName()}第${indexCN}天`;
+      }
+      const lucky = calculateLuckyNumbers(lun);
+      const eight = lun.getEightChar();
+      eight.setSect(2);
+      const nayinName = lun.getDayNaYin();
+      const solarDays = SolarUtil.getDaysOfMonth(sol.getYear(), sol.getMonth());
+      const ci = LunarUtil.getJiaZiIndex(lun.getDayChongGan() + lun.getDayChong());
+      const ly = lun.getYear();
+      const birthA = ly - ((((ly - 4 - ci) % 60) + 60) % 60);
+      let clashAge = null;
+      [birthA, birthA - 60].filter(b => b >= 1901 && b <= 2099).forEach(b => {
+        const age = ly - b + 1;
+        if (age >= 1 && (clashAge === null || age < clashAge)) clashAge = age;
+      });
+      let luckRow = "";
+      const times = lun.getTimes();
+      for (let i = 0; i < 12 && i < times.length; i++) luckRow += times[i].getTianShenLuck();
+      const tai = lun.getDayPositionTai() || "";
+      let tai1 = tai, tai2 = "—", mk = -1;
+      ["外","房内"].forEach(w => { const k = tai.indexOf(w); if (k > -1 && (mk < 0 || k < mk)) mk = k; });
+      if (mk > -1) { tai1 = tai.slice(0, mk).trim(); tai2 = tai.slice(mk).trim(); }
+      const yearSx = lun.getYearShengXiao();
+      const ai = lun.getYearZhiIndex();
+      const zodiac12 = LunarUtil.SHENGXIAO.slice(1).map((name, i) => {
+        const start = ((ai - i + 12) % 12) + 1, nums = [];
+        for (let n = start; n <= 49; n += 12) nums.push(pad(n));
+        return { animal: name, nums };
+      });
+      const serial = serialOf(dateStr);
+      const daily = dailyText(serial);
+      const holidayCouplet = holidayCoupletOf(sol, lun, todayJq ? todayJq.getName() : "");
+      const greg = utcDate(sol.getYear(), sol.getMonth(), sol.getDay());
+      const dayGanzhi = lun.getDayInGanZhi();
+      const jiaziIndex = window.LunarUtil.JIA_ZI.indexOf(dayGanzhi);
+      const gates = ['正北','西南','正东','东南','西北','正西','东北','正南'];
+      const luckyGate = gates[Math.floor(jiaziIndex / 3) % 8];
+      const result = {
+        date: dateStr, serial,
+        y: sol.getYear(), m: sol.getMonth(), day: sol.getDay(),
+        monEn: EN_MONTH.format(greg).toUpperCase(),
+        monCnNum: LunarUtil.NUMBER[sol.getMonth()],
+        wkEn: EN_WEEKDAY.format(greg).toUpperCase(),
+        wkCn: "星期" + sol.getWeekInChinese(),
+        isWeekend: sol.getWeek() === 0 || sol.getWeek() === 6,
+        gzYear: lun.getYearInGanZhi(),
+        monCN: lun.getMonthInChinese(),
+        solarSizeCN: solarDays === 31 ? "大" : solarDays === 30 ? "小" : "平",
+        sizeCN: mm && mm.getDayCount() === 30 ? "大" : "小",
+        dayCN: lun.getDayInChinese(),
+        lunarDay: lun.getDay(),
+        seasonalLabel,
+        termLabel: termPrefix + nt.getName(),
+        termName: nt.getName(),
+        termDayCN: nl.getDayInChinese(),
+        termM: ns.getMonth(), termD: ns.getDay(),
+        yi: lun.getDayYi(1).filter(x => x.length <= 2).slice(0, 6),
+        ji: lun.getDayJi(1).filter(x => x.length <= 2).slice(0, 4),
+        yearSx, monthSx: lun.getMonthShengXiao(), daySx: lun.getDayShengXiao(),
+        clashSx: lun.getDayChongShengXiao(), clashAge,
+        dayGan: lun.getDayGan(), dayZhi: lun.getDayZhi(),
+        ganEl: LunarUtil.WU_XING_GAN[lun.getDayGan()],
+        zhiEl: LunarUtil.WU_XING_ZHI[lun.getDayZhi()],
+        nayinName, nayinEl: nayinName.charAt(nayinName.length - 1),
+        xiu: lun.getXiu(), zhiXing: lun.getZhiXing(),
+        bazi: [eight.getYear(), eight.getMonth(), eight.getDay(), eight.getTime()],
+        gods: [
+          { name: "喜神", dir: lun.getDayPositionXiDesc() },
+          { name: "财神", dir: lun.getDayPositionCaiDesc() },
+          { name: "贵神", dir: lun.getDayPositionYangGuiDesc() },
+          { name: "吉门", dir: luckyGate }
+        ],
+        numColor: lun.getDayNineStar().getNumber() + lun.getDayNineStar().getColor(),
+        feixing: yearFeixing(lun),
+        luckRow, tai1, tai2,
+        tide: TIDE[lun.getDay()] || ["06:00","12:00"],
+        zodiac12,
+        luckyZodiacs: lucky.zodiacs,
+        luckyNumbers: lucky.numbers,
+        couplet: holidayCouplet || daily.couplet,
+        dream: daily.dream
+      };
+      if (almanacCache.size > 120) almanacCache.clear();
+      almanacCache.set(dateStr, result);
+      return result;
+    }
+
+    /* ===== DOM References ===== */
+    const $ = id => document.getElementById(id);
+    const topBar = $("topBar");
+    const dateMain = $("dateMain");
+    const dateSub = $("dateSub");
+    const btnPrev = $("btnPrev");
+    const btnNext = $("btnNext");
+    const btnToday = $("btnToday");
+    const btnExport = $("btnExport");
+    const dateCenter = $("dateCenter");
+    const slideContainer = $("slideContainer");
+    const pageCurrent = $("pageCurrent");
+    const pagePrev = $("pagePrev");
+    const pageNext = $("pageNext");
+    const pickerOverlay = $("pickerOverlay");
+    const pickerYear = $("pickerYear");
+    const pickerMonth = $("pickerMonth");
+    const pickerDay = $("pickerDay");
+
+    /* ===== State ===== */
+    let currentIndex = TODAY_INDEX;
+    let isAnimating = false;
+    let currentDateStr = TODAY_DATE;
+
+    /* ===== Render Card HTML ===== */
+    function renderCardHTML(d) {
+      if (!d) return '<div class="card-content"><p style="text-align:center;padding:40px;color:#999;">历法数据加载中…</p></div>';
+      const isW = d.isWeekend;
+      const themeClass = isW ? "is-weekend" : "";
+      const pc = isW ? COLORS.weekend.primary : COLORS.normal.primary;
+
+      // Zodiac items: show 4 at a time based on serial
+      const page = (d.serial % 3) * 4;
+      const zodiacItems = [0,1,2,3].map(i => d.zodiac12[page+i]).filter(Boolean);
+
+      return `
+      <div class="card-content ${themeClass}">
+        <!-- Hero -->
+        <div class="hero ${themeClass}">
+          <div class="hero-day">${d.day}</div>
+          <div class="hero-weekday">${d.wkCn}</div>
+          <div class="hero-lunar">
+            农历${d.gzYear}年${d.monCN}月${d.sizeCN} · ${d.dayCN}日
+            ${d.seasonalLabel ? '<br>' + d.seasonalLabel : ''}
+          </div>
+          ${d.termName ? `<span class="hero-term ${themeClass}">${d.termLabel}</span>` : ''}
+          <div class="hero-en">${d.monEn} ${d.wkEn}</div>
+        </div>
+
+        <!-- Yi / Ji -->
+        <div class="section ${themeClass}">
+          <div class="yiji-grid">
+            <div class="yiji-col">
+              <div class="yiji-label yi"><i class="ri-check-line"></i> 宜</div>
+              <div class="yiji-items">
+                ${d.yi.length ? d.yi.map(x => `<span class="yiji-tag yi">${x}</span>`).join("") : '<span style="font-size:12px;color:#999">无</span>'}
+              </div>
+            </div>
+            <div class="yiji-col">
+              <div class="yiji-label ji"><i class="ri-close-line"></i> 忌</div>
+              <div class="yiji-items">
+                ${d.ji.length ? d.ji.map(x => `<span class="yiji-tag ji">${x}</span>`).join("") : '<span style="font-size:12px;color:#999">无</span>'}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- GanZhi / WuXing -->
+        <div class="section ${themeClass}">
+          <div class="section-title"><i class="ri-yin-yang-line"></i> 干支五行</div>
+          <div class="gz-row">
+            <span class="gz-pill">${d.dayGan}<span class="el">属${d.ganEl}</span></span>
+            <span class="gz-pill">${d.dayZhi}<span class="el">属${d.zhiEl}</span></span>
+          </div>
+          <div class="gz-nayin">纳音${d.nayinName || ""}</div>
+          <div style="margin-top:8px" class="clash-row">
+            <span>${d.yearSx}年${d.monthSx}月</span>
+            <span>|</span>
+            <span>${d.daySx}日冲${d.clashSx}${d.clashAge ? ' 生年'+d.clashAge+'岁' : ''}</span>
+          </div>
+        </div>
+
+        <!-- Gods / Directions -->
+        <div class="section ${themeClass}">
+          <div class="section-title"><i class="ri-compass-3-line"></i> 神煞方位</div>
+          <div class="gods-grid">
+            ${d.gods.map(g => `<div class="god-item"><div class="god-name">${g.name}</div><div class="god-dir">${g.dir}</div></div>`).join("")}
+          </div>
+        </div>
+
+        <!-- Bazi -->
+        <div class="section ${themeClass}">
+          <div class="section-title"><i class="ri-git-branch-line"></i> 八字</div>
+          <div class="bazi-row">
+            ${d.bazi.map((bz, i) => `<div class="bazi-pill"><span class="label">${["年","月","日","时"][i]}</span><span class="value">${bz}</span></div>`).join("")}
+          </div>
+        </div>
+
+        <!-- Feixing -->
+        <div class="section ${themeClass}">
+          <div class="section-title"><i class="ri-flashlight-line"></i> 九宫飞星</div>
+          <div class="feixing-wrap">${renderFeixingSVG(d.feixing, pc)}</div>
+        </div>
+
+        <!-- Zodiac Grid -->
+        <div class="section ${themeClass}">
+          <div class="section-title"><i class="ri-star-line"></i> 生肖运程</div>
+          <div class="zodiac-grid">
+            ${zodiacItems.map(z => `<div class="zodiac-item"><div class="zodiac-animal">${z.animal}</div><div class="zodiac-nums">${z.nums.join(" ")}</div></div>`).join("")}
+          </div>
+        </div>
+
+        <!-- Lucky -->
+        <div class="section ${themeClass}">
+          <div class="section-title"><i class="ri-seedling-line"></i> 吉数吉肖</div>
+          <div class="lucky-row">
+            <span><span class="lucky-label">吉肖</span> <span class="lucky-value">${d.luckyZodiacs}</span></span>
+            <span><span class="lucky-label">吉数</span> <span class="lucky-value">${d.luckyNumbers.join(" ")}</span></span>
+          </div>
+          <div style="margin-top:6px" class="nine-star">九星${d.numColor} · 宿${d.xiu} · 值星${d.zhiXing}</div>
+        </div>
+
+        <!-- Couplet -->
+        <div class="section ${themeClass}">
+          <div class="section-title"><i class="ri-double-quotes-l"></i> 对联</div>
+          <div class="couplet-wrap">
+            <span class="couplet-col">${d.couplet[0]}</span>
+            <span class="couplet-col">${d.couplet[1]}</span>
+          </div>
+        </div>
+
+        <!-- Dream -->
+        <div class="section ${themeClass}">
+          <div class="section-title"><i class="ri-moon-line"></i> 解梦</div>
+          <div class="dream-text">${d.dream}</div>
+        </div>
+
+        <!-- Tide & Tai -->
+        <div class="section ${themeClass}">
+          <div class="section-title"><i class="ri-water-flash-line"></i> 潮汐 · 胎神</div>
+          <div class="tide-row">
+            <span>涨潮 ${d.tide[0]}</span>
+            <span>落潮 ${d.tide[1]}</span>
+          </div>
+          <div style="margin-top:6px" class="tai-text">胎神 ${d.tai1} ${d.tai2}</div>
+        </div>
+      </div>`;
+    }
+
+    /* ===== Update UI ===== */
+    function updateDateNav(d) {
+      if (!d) return;
+      dateMain.textContent = `${d.y}年${d.m}月${d.day}日`;
+      dateSub.textContent = `农历${d.gzYear}年${d.monCN}月${d.dayCN}日 · ${d.wkCn}`;
+      btnPrev.disabled = currentIndex <= MIN_INDEX;
+      btnNext.disabled = currentIndex >= MAX_INDEX;
+      topBar.classList.toggle("is-weekend", d.isWeekend);
+      document.title = `${d.date} · 老黄历`;
+    }
+
+    function renderPage(pageEl, dateStr) {
+      const d = almanac(dateStr);
+      pageEl.innerHTML = renderCardHTML(d);
+      pageEl._dateStr = dateStr;
+      pageEl._data = d;
+    }
+
+    function setCurrentDate(index, direction) {
+      if (isAnimating) return;
+      index = clamp(index, MIN_INDEX, MAX_INDEX);
+      if (index === currentIndex) return;
+
+      const oldDate = currentDateStr;
+      const newDate = dateOf(index);
+      const dir = direction || (index > currentIndex ? 1 : -1);
+
+      isAnimating = true;
+
+      // Prepare the incoming page
+      const incomingPage = dir > 0 ? pageNext : pagePrev;
+      const outgoingPage = pageCurrent;
+      renderPage(incomingPage, newDate);
+
+      // Position incoming off-screen without transition
+      incomingPage.classList.add("no-transition");
+      incomingPage.classList.remove("active", "left", "right");
+      incomingPage.classList.add(dir > 0 ? "right" : "left");
+      void incomingPage.offsetWidth; // force reflow
+      incomingPage.classList.remove("no-transition");
+
+      // Animate
+      outgoingPage.classList.remove("active");
+      outgoingPage.classList.add(dir > 0 ? "left" : "right");
+      incomingPage.classList.remove("left", "right");
+      incomingPage.classList.add("active");
+
+      const d = almanac(newDate);
+      updateDateNav(d);
+
+      currentIndex = index;
+      currentDateStr = newDate;
+
+      // Pre-render the other side
+      const preDate = dateOf(clamp(index + dir, MIN_INDEX, MAX_INDEX));
+      const prePage = dir > 0 ? pagePrev : pageNext;
+      renderPage(prePage, preDate);
+
+      setTimeout(() => {
+        isAnimating = false;
+        // Reset outgoing page position
+        outgoingPage.classList.remove("left", "right");
+      }, 360);
+    }
+
+    function goToDate(dateStr) {
+      if (!dateStr) return;
+      dateStr = dateStr < FIRST_DATE ? FIRST_DATE : dateStr > MAX_DATE ? MAX_DATE : dateStr;
+      const target = daysBetween(dateStr, FIRST_DATE);
+      if (target === currentIndex) return;
+      setCurrentDate(target, target > currentIndex ? 1 : -1);
+    }
+
+    function goToday() {
+      if (currentIndex === TODAY_INDEX) return;
+      setCurrentDate(TODAY_INDEX, TODAY_INDEX > currentIndex ? 1 : -1);
+    }
+
+    /* ===== Touch Swipe ===== */
+    let touchStartX = 0, touchStartY = 0, touchStartTime = 0;
+    let isSwiping = false;
+
+    slideContainer.addEventListener("touchstart", e => {
+      if (isAnimating) return;
+      touchStartX = e.touches[0].clientX;
+      touchStartY = e.touches[0].clientY;
+      touchStartTime = Date.now();
+      isSwiping = false;
+    }, { passive: true });
+
+    slideContainer.addEventListener("touchmove", e => {
+      if (isAnimating) return;
+      const dx = e.touches[0].clientX - touchStartX;
+      const dy = e.touches[0].clientY - touchStartY;
+      if (!isSwiping && Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy)) {
+        isSwiping = true;
+      }
+    }, { passive: true });
+
+    slideContainer.addEventListener("touchend", e => {
+      if (isAnimating || !isSwiping) return;
+      const dx = e.changedTouches[0].clientX - touchStartX;
+      const elapsed = Date.now() - touchStartTime;
+      const velocity = Math.abs(dx) / elapsed;
+      if ((Math.abs(dx) > 50 || velocity > 0.3) && Math.abs(dx) > Math.abs(e.changedTouches[0].clientY - touchStartY)) {
+        if (dx < 0 && currentIndex < MAX_INDEX) {
+          setCurrentDate(currentIndex + 1, 1);
+        } else if (dx > 0 && currentIndex > MIN_INDEX) {
+          setCurrentDate(currentIndex - 1, -1);
+        }
+      }
+      isSwiping = false;
+    }, { passive: true });
+
+    /* ===== Keyboard Navigation ===== */
+    document.addEventListener("keydown", e => {
+      if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
+      if (e.key === "ArrowRight" || e.key === "ArrowUp") {
+        e.preventDefault();
+        if (currentIndex < MAX_INDEX) setCurrentDate(currentIndex + 1, 1);
+      } else if (e.key === "ArrowLeft" || e.key === "ArrowDown") {
+        e.preventDefault();
+        if (currentIndex > MIN_INDEX) setCurrentDate(currentIndex - 1, -1);
+      } else if (e.key.toLowerCase() === "t") {
+        e.preventDefault();
+        goToday();
+      }
+    });
+
+    /* ===== Button Events ===== */
+    btnPrev.addEventListener("click", () => {
+      if (currentIndex > MIN_INDEX) setCurrentDate(currentIndex - 1, -1);
+    });
+    btnNext.addEventListener("click", () => {
+      if (currentIndex < MAX_INDEX) setCurrentDate(currentIndex + 1, 1);
+    });
+    btnToday.addEventListener("click", goToday);
+
+    /* ===== Date Picker ===== */
+    function openPicker() {
+      const d = almanac(currentDateStr);
+      if (d) {
+        pickerYear.value = d.y;
+        pickerMonth.value = d.m;
+        pickerDay.value = d.day;
+      }
+      pickerOverlay.classList.add("open");
+    }
+    function closePicker() {
+      pickerOverlay.classList.remove("open");
+    }
+    dateCenter.addEventListener("click", openPicker);
+    $("pickerClose").addEventListener("click", closePicker);
+    pickerOverlay.addEventListener("click", e => {
+      if (e.target === pickerOverlay) closePicker();
+    });
+    $("pickerToday").addEventListener("click", () => {
+      closePicker();
+      goToday();
+    });
+    $("pickerGo").addEventListener("click", () => {
+      const y = parseInt(pickerYear.value), m = parseInt(pickerMonth.value), d = parseInt(pickerDay.value);
+      if (y >= 1900 && y <= 2099 && m >= 1 && m <= 12 && d >= 1 && d <= 31) {
+        const dateStr = `${y}-${pad(m)}-${pad(d)}`;
+        closePicker();
+        goToDate(dateStr);
+      }
+    });
+
+    /* ===== Export (simple screenshot) ===== */
+    btnExport.addEventListener("click", () => {
+      // Use html2canvas approach or simple print
+      window.print();
+    });
+
+    /* ===== Init ===== */
+    async function init() {
+      const dailyTextReady = loadDailyText();
+      const holidayReady = loadHolidayCouplets();
+
+      // Render initial page
+      renderPage(pageCurrent, TODAY_DATE);
+      const d = almanac(TODAY_DATE);
+      updateDateNav(d);
+
+      // Pre-render adjacent pages
+      await dailyTextReady;
+      await holidayReady;
+
+      // Re-render with full data
+      almanacCache.clear();
+      renderPage(pageCurrent, TODAY_DATE);
+      updateDateNav(almanac(TODAY_DATE));
+
+      // Pre-render neighbors
+      if (TODAY_INDEX > MIN_INDEX) renderPage(pagePrev, dateOf(TODAY_INDEX - 1));
+      if (TODAY_INDEX < MAX_INDEX) renderPage(pageNext, dateOf(TODAY_INDEX + 1));
+
+      // Hide loading
+      $("loading").classList.add("hidden");
+    }
+
+    init().catch(e => {
+      console.error("[Calendar] Init failed:", e);
+      $("loading").classList.add("hidden");
+    });
+  })();
+  </script>
+</body>
+</html>

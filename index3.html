@@ -1,0 +1,5063 @@
+<!doctype html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#33363b" />
+  <title>老黄历 · 纸上光阴</title>
+  <link rel="icon" href="data:," />
+  <script src="./lunar.js" onerror="window.__lunarFailed = true"></script>
+  <script src="./snapdom.js" onerror="window.__snapdomFailed = true"></script>
+  <script src="./lite-datepicker.js"></script>
+  <script src="./calendar-art.js?v=3.1"></script>
+  <style>
+    /* 主题变量 */
+    @font-face {
+      font-family: "ShengXiao";
+      src: url("shengxiao.ttf") format("truetype");
+      font-weight: normal;
+      font-style: normal;
+      font-display: swap;
+    }
+
+    @font-face {
+      font-family: "ShengXiao1";
+      src: url("shengxiao1.ttf") format("truetype");
+      font-weight: normal;
+      font-style: normal;
+      font-display: swap;
+    }
+
+    @font-face {
+      font-family: "FZXingKai-S04S";
+      src: url("./FZXingKai-S04S.subset.woff2") format("woff2");
+      font-weight: normal;
+      font-style: normal;
+      font-display: swap;
+    }
+
+    @font-face {
+      font-family: "remixicon";
+      src: url("./remixicon-subset.woff2") format("woff2");
+      font-display: swap;
+    }
+
+    [class^="ri-"],
+    [class*=" ri-"] {
+      font-family: "remixicon" !important;
+      font-style: normal;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    .ri-calendar-line::before {
+      content: "\eb27";
+    }
+
+    .ri-download-2-line::before {
+      content: "\ec54";
+    }
+
+    @font-face {
+      font-family: "STHupo";
+      src: url("./STHupo.woff2") format("woff2");
+      font-weight: normal;
+      font-style: normal;
+      font-display: swap;
+    }
+
+
+    :root {
+      --color-primary: #1b5e20;
+      --color-primary-light: rgba(27, 94, 32, 0.4);
+      --color-primary-tint: rgba(27, 94, 32, 0.1);
+      --dock-muted: #4d7c50;
+      --color-red-stamp: #d32f2f;
+      --color-bg-paper: #fdfcf7;
+      --color-white: #ffffff;
+      --stroke-width: 2.2;
+      --page-w-mm: 155mm;
+      --page-h-mm: 200mm;
+      --page-ratio: 155 / 200;
+      --book-h: 623.225806px;
+      --book-w-factor: 0.673913;
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+      outline: none;
+    }
+
+    html,
+    body {
+      margin: 0;
+      width: 100%;
+      min-height: 100%;
+    }
+
+    body {
+      min-height: 100svh;
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+      background: #33363b;
+      color: #d5d6d5;
+      font-family: Arial, "Microsoft YaHei", sans-serif;
+      line-height: normal;
+    }
+
+    button {
+      font: inherit;
+    }
+
+    button:focus-visible {
+      outline: 1px solid #d4d7cc;
+      outline-offset: 5px;
+    }
+
+    [hidden] {
+      display: none !important;
+    }
+
+    .app {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 19px;
+      animation: arrive 0.55s ease-out both;
+    }
+
+    #book-space {
+      position: relative;
+      touch-action: none;
+
+      width: min(calc((100svh - 10mm - var(--roll-reserve, 0px)) * var(--book-w-factor, 0.775)),
+          calc((270mm - var(--roll-reserve, 0px)) * var(--book-w-factor, 0.775)),
+          calc(100vw - 64px));
+      transform: translateY(calc(var(--roll-reserve, 0px) / 2));
+      aspect-ratio: var(--page-ratio, 155 / 200);
+    }
+
+    #book {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 420px;
+      height: var(--book-h, 623.225806px);
+      isolation: isolate;
+      transform-origin: 0 0;
+      border-radius: 3px;
+      background: #d8d7d1;
+      box-shadow:
+        0 30px 60px #0006,
+        0 15px 20px #0003,
+        0 2px 0 #b9b8b3;
+      touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
+      cursor: grab;
+      will-change: transform;
+    }
+
+    #book[data-state="flip"],
+    #book[data-state="tear"] {
+      cursor: grabbing;
+    }
+
+
+    .resting-page {
+      position: absolute;
+      inset: 0;
+      width: 420px;
+      height: var(--book-h, 623.225806px);
+      pointer-events: none;
+      will-change: transform;
+      transform: translateZ(0);
+    }
+
+    #next-page {
+      z-index: 2;
+    }
+
+    #current-page {
+      z-index: 3;
+    }
+
+    .page-loader {
+      position: absolute;
+      inset: 0;
+      z-index: 4;
+      width: 420px;
+      height: var(--book-h, 541.935484px);
+      pointer-events: none;
+      background: var(--color-bg-paper);
+      display: grid;
+      place-items: center;
+    }
+
+    .page-loader::before {
+      content: "";
+      width: 30px;
+      height: 30px;
+      border: 3px solid color-mix(in srgb, var(--color-primary) 18%, transparent);
+      border-top-color: var(--color-primary);
+      border-radius: 50%;
+      animation: page-loading 0.7s linear infinite;
+    }
+
+    @keyframes page-loading {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .motion-canvas {
+      position: absolute;
+      pointer-events: none;
+      will-change: transform;
+      transform: translateZ(0);
+    }
+
+    #paper-canvas {
+      z-index: 20;
+    }
+
+    #tear-canvas {
+      z-index: 30;
+    }
+
+    #bar {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 8px;
+      z-index: 5;
+      pointer-events: none;
+      background: linear-gradient(#bebfbd, #989a97 55%, #797c79);
+      box-shadow: 0 1px 2px #0003;
+    }
+
+
+    .rolled-top {
+      position: absolute;
+      top: auto;
+      bottom: calc(100% - 8px);
+      left: -1px;
+      width: 422px;
+      z-index: 8;
+      overflow: hidden;
+      border-radius: 4px 4px 0 0;
+      pointer-events: auto;
+      cursor: grab;
+      background: #eeebe2;
+      box-shadow:
+        0 3px 5px #0004,
+        0 1px 1px #0003;
+      will-change: transform, height, opacity;
+    }
+
+    .rolled-top:active {
+      cursor: grabbing;
+    }
+
+    #roll-canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    .nav-btn {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      z-index: 40;
+      width: 48px;
+
+      height: 48px;
+      border-radius: 50%;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      background: #43474d;
+      color: #e7e8e4;
+      font-size: 26px;
+      line-height: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      padding: 0 0 2px;
+      box-shadow: 0 6px 16px #0005;
+      opacity: 0.35;
+      pointer-events: auto;
+      transition:
+        opacity 0.22s ease,
+        background 0.18s,
+        transform 0.18s;
+    }
+
+
+    .nav-btn::after {
+      content: "";
+      position: absolute;
+      inset: -20px;
+      border-radius: 50%;
+    }
+
+    #book-space:hover .nav-btn,
+    #book-space:focus-within .nav-btn,
+    .nav-btn:focus-visible {
+      opacity: 0.85;
+
+    }
+
+    @media (hover: none) {
+      .nav-btn {
+        opacity: 0.85;
+      }
+    }
+
+    .nav-btn:hover:not(:disabled) {
+      opacity: 1;
+      background: #565b62;
+      transform: translateY(-50%) scale(1.08);
+    }
+
+    .nav-btn:active:not(:disabled) {
+      transform: translateY(-50%) scale(0.94);
+    }
+
+    .nav-btn:disabled {
+      opacity: 0.2;
+      cursor: not-allowed;
+    }
+
+    #book-space:hover .nav-btn:disabled {
+      opacity: 0.2;
+    }
+
+    .nav-prev {
+      left: -60px;
+
+    }
+
+    .nav-next {
+      right: -60px;
+    }
+
+    @media (max-width: 540px) {
+      .nav-prev {
+        left: -46px;
+        width: 40px;
+        height: 40px;
+        font-size: 22px;
+      }
+
+      .nav-next {
+        right: -46px;
+        width: 40px;
+        height: 40px;
+        font-size: 22px;
+      }
+    }
+
+
+    .book-tabs,
+    .dock-panel {
+      --tab-bw: 1.5px;
+    }
+
+    .book-tabs {
+      --tab-size: 28px;
+      position: absolute;
+      top: 14px;
+      left: 100%;
+      z-index: -1;
+
+      display: flex;
+      flex-direction: column;
+      width: calc(var(--tab-size) + var(--tab-bw));
+      border: var(--tab-bw) solid var(--color-primary);
+      border-left: 0;
+      border-radius: 0 10px 10px 0;
+      background: var(--color-bg-paper);
+      box-shadow: 3px 5px 12px #0004;
+    }
+
+    .tab-slot {
+      display: contents;
+    }
+
+    .tab-btn {
+      display: grid;
+      place-items: center;
+      width: 100%;
+      height: var(--tab-size);
+      padding: 0;
+      font-size: 16px;
+      border: 0;
+      background: transparent;
+      color: var(--color-primary);
+      cursor: pointer;
+
+      transition: background 0.16s;
+    }
+
+    .tab-slot:first-child>.tab-btn {
+      border-top-right-radius: calc(10px - var(--tab-bw));
+    }
+
+    .tab-slot:last-child>.tab-btn {
+      border-bottom-right-radius: calc(10px - var(--tab-bw));
+    }
+
+    .tab-slot+.tab-slot>.tab-btn {
+      border-top: 1px solid var(--color-primary-light);
+    }
+
+    .tab-btn:hover {
+      background: var(--color-primary-tint);
+    }
+
+    .tab-btn[aria-expanded="true"] {
+      background: var(--color-primary);
+      color: var(--color-bg-paper);
+    }
+
+    .tab-btn:focus-visible {
+      outline: 2px solid var(--color-primary);
+      outline-offset: -5px;
+    }
+
+    .tab-btn[aria-expanded="true"]:focus-visible {
+      outline-color: var(--color-bg-paper);
+    }
+
+    @media (max-width: 540px) {
+      .book-tabs {
+        --tab-size: 24px;
+        top: 10px;
+      }
+
+      .tab-btn {
+        font-size: 14px;
+      }
+    }
+
+
+    /* 从工具按钮左侧出发：先向左拉宽，再向下展开；收起时反向执行。 */
+    .dock-panel {
+      position: fixed;
+      z-index: 70;
+      top: var(--dock-top, 24px);
+      right: var(--dock-right, 48px);
+      width: 0;
+      max-height: 48px;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      border: var(--tab-bw) solid var(--color-primary);
+      border-radius: 14px 6px 14px 14px;
+      background: var(--color-bg-paper);
+      box-shadow: 0 18px 48px #0006, 0 4px 12px #0003;
+      color: var(--color-primary);
+      font-size: 13px;
+      opacity: 0;
+      pointer-events: none;
+      transform-origin: top right;
+      transition: max-height .22s ease 0s, width .22s ease .18s, opacity .15s ease .25s;
+      --ldp-accent: var(--color-primary);
+      --ldp-text: var(--color-primary);
+      --ldp-muted: var(--dock-muted);
+      --ldp-border: var(--color-primary-light);
+      --ldp-ring: var(--color-primary-tint);
+      --ldp-tint: var(--color-primary-tint);
+      --ldp-cell-bg: var(--color-primary-tint);
+      --ldp-bg: var(--color-bg-paper);
+    }
+
+    .dock-panel.is-open {
+      width: var(--dock-width, 380px);
+      max-height: var(--dock-height, 640px);
+      opacity: 1;
+      pointer-events: auto;
+      transition: width .26s cubic-bezier(.2, .9, .25, 1) 0s,
+        max-height .38s cubic-bezier(.16, 1, .3, 1) .22s, opacity .18s ease 0s;
+    }
+
+    .dock-content {
+      width: calc(var(--dock-width, 380px) - 2 * var(--tab-bw));
+      max-height: calc(var(--dock-height, 640px) - 2 * var(--tab-bw));
+      padding: 0 16px 16px;
+      overflow: auto;
+      overscroll-behavior: contain;
+      scrollbar-width: thin;
+      opacity: 0;
+      transition: opacity .12s ease;
+    }
+
+    .dock-panel.is-open .dock-content {
+      opacity: 1;
+      transition: opacity .22s ease .24s;
+    }
+
+    .dock-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      min-height: 52px;
+      margin-bottom: 12px;
+      border-bottom: 1px solid var(--color-primary-light);
+    }
+
+    .dock-header h2 {
+      margin: 0;
+      font-size: 14px;
+      letter-spacing: 1px;
+    }
+
+    .dock-close {
+      display: grid;
+      place-items: center;
+      width: 28px;
+      height: 28px;
+      flex-shrink: 0;
+      padding: 0;
+      border: 0;
+      border-radius: 7px;
+      background: var(--color-primary-tint);
+      color: var(--color-primary);
+      font-size: 20px;
+      cursor: pointer;
+    }
+
+    .dock-close:hover {
+      background: var(--color-primary);
+      color: var(--color-bg-paper);
+    }
+
+    .dock-label {
+      display: block;
+      margin: 0 0 7px;
+      font-size: 12px;
+      color: var(--dock-muted);
+    }
+
+    .dock-help {
+      margin: 10px 0 0;
+      font-size: 11px;
+      line-height: 1.6;
+      color: var(--dock-muted);
+    }
+
+    .date-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 16px;
+    }
+
+    .date-actions button {
+      padding: 8px 14px;
+      border: 1px solid var(--color-primary);
+      border-radius: 8px;
+      background: transparent;
+      color: var(--color-primary);
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    .date-actions .primary {
+      flex: 1;
+      background: var(--color-primary);
+      color: #fff;
+    }
+
+    .date-actions button:hover {
+      filter: brightness(1.15);
+    }
+
+    .dock-panel button:focus-visible {
+      outline: 2px solid var(--color-primary);
+      outline-offset: 2px;
+    }
+
+    .date-picker-host {
+      min-width: 0;
+    }
+
+    @media (max-width: 540px) {
+      .dock-content {
+        padding: 0 12px 12px;
+      }
+
+      .dock-panel .ldp {
+        gap: 5px;
+        font-size: 12px;
+      }
+
+      .dock-panel .ldp-trigger {
+        padding: 9px 6px;
+        gap: 3px;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+
+      .dock-panel,
+      .dock-panel.is-open,
+      .dock-content,
+      .dock-panel.is-open .dock-content,
+      .tab-btn {
+        transition: none;
+      }
+    }
+
+    .export-seg {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 6px;
+    }
+
+    .export-seg button {
+      padding: 7px 0;
+      border-radius: 8px;
+      border: 1px solid var(--color-primary-light);
+      background: transparent;
+      color: var(--color-primary);
+      font-size: 12px;
+      cursor: pointer;
+      transition: background 0.16s, color 0.16s;
+    }
+
+    .export-seg button:hover {
+      background: var(--color-primary-tint);
+    }
+
+    .export-seg button[aria-pressed="true"] {
+      border-color: var(--color-primary);
+      background: var(--color-primary);
+      color: var(--color-bg-paper);
+      font-weight: 700;
+    }
+
+    .export-custom {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+      margin-top: 14px;
+    }
+
+    .export-custom .date-field {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      font-size: 11px;
+      color: var(--dock-muted);
+    }
+
+    .export-summary {
+      margin: 10px 0 0;
+      line-height: 1.55;
+      word-break: break-all;
+    }
+
+    .export-summary b {
+      font-weight: 700;
+    }
+
+    .export-note {
+      color: var(--dock-muted);
+    }
+
+    .export-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 11px;
+    }
+
+    .export-actions button {
+      flex: 1;
+      padding: 9px 0;
+      border-radius: 9px;
+      border: 1px solid var(--color-primary);
+      background: transparent;
+      color: var(--color-primary);
+      font-size: 13px;
+      cursor: pointer;
+      transition: filter 0.16s, background 0.16s;
+    }
+
+    .export-actions button.primary {
+      background: var(--color-primary);
+      color: #fff;
+      font-weight: 700;
+      letter-spacing: 1px;
+    }
+
+    .export-actions button:hover:not(:disabled) {
+      filter: brightness(1.2);
+    }
+
+    .export-actions button:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+      filter: none;
+    }
+
+    .export-status {
+      margin: 9px 0 0;
+      min-height: 1em;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .export-status[data-kind="error"] {
+      color: var(--color-red-stamp);
+    }
+
+    .export-status[data-kind="ok"] {
+      color: var(--color-primary);
+      font-weight: 700;
+    }
+
+
+    .export-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 90;
+      display: grid;
+      place-items: center;
+      background: rgba(18, 20, 22, 0.74);
+      backdrop-filter: blur(3px);
+    }
+
+    .export-overlay__box {
+      width: min(86vw, 330px);
+      padding: 18px;
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      background: rgba(48, 52, 57, 0.98);
+      box-shadow: 0 24px 60px #0008;
+      color: #e7e8e4;
+      text-align: center;
+    }
+
+    .export-overlay__title {
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+    }
+
+    .export-overlay__bar {
+      height: 6px;
+      margin-top: 14px;
+      border-radius: 999px;
+      background: #2c2f34;
+      overflow: hidden;
+    }
+
+    .export-overlay__bar>i {
+      display: block;
+      width: 0;
+      height: 100%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, #6f8a72, #a8dcae);
+      transition: width 0.15s linear;
+    }
+
+    .export-overlay__meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-top: 11px;
+      font-size: 12px;
+      opacity: 0.82;
+    }
+
+    .export-overlay__meta button {
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      background: #43474d;
+      color: #e7e8e4;
+      border-radius: 7px;
+      padding: 4px 10px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    .export-overlay__meta button:hover {
+      background: #565b62;
+    }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    @keyframes arrive {
+      from {
+        opacity: 0;
+        translate: 0 5px;
+      }
+
+      to {
+        opacity: 1;
+        translate: 0 0;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .app {
+        animation: none;
+      }
+    }
+
+
+    #tex-host {
+      position: fixed;
+      left: -20000px;
+      top: 0;
+      width: var(--page-w-mm, 155mm);
+      height: var(--page-h-mm, 200mm);
+      pointer-events: none;
+    }
+
+    .calendar-card {
+      width: var(--page-w-mm, 155mm);
+      height: var(--page-h-mm, 200mm);
+      padding: 10mm;
+      box-sizing: border-box;
+      background: var(--color-bg-paper);
+      display: grid;
+      color: var(--color-primary);
+      container-type: size;
+      --u: calc(100cqw / 180);
+      --uh: calc(100cqh / 256);
+      --border-width: calc(0.6 * var(--u));
+      grid-template-columns: 15.144fr 13.456fr 25.472fr 1.676fr 29fr 2.354fr 25.453fr 13.494fr 15.144fr;
+      grid-template-rows: 14.847fr 76.702fr 7.062fr 13fr 14.247fr 8fr 5.448fr 1.465fr 12.031fr 6.921fr 8fr 8fr;
+      font-family: "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", sans-serif;
+    }
+
+    .calendar-card.weekend {
+      --color-primary: #c62828;
+      --color-primary-light: rgba(198, 40, 40, 0.4);
+      --color-primary-tint: rgba(198, 40, 40, 0.1);
+    }
+
+    .calendar-card .table-cell {
+      position: relative;
+      overflow: hidden;
+      border-right: var(--border-width) solid var(--color-primary);
+      border-bottom: var(--border-width) solid var(--color-primary);
+    }
+
+    .calendar-card .grid-lunar-date,
+    .calendar-card .grid-solar-term,
+    .calendar-card .grid-weekday {
+      border-top: var(--border-width) solid var(--color-primary);
+    }
+
+    .calendar-card .grid-lunar-date,
+    .calendar-card .grid-suitable,
+    .calendar-card .grid-zodiac-wrap,
+    .calendar-card .grid-lucky-numbers,
+    .calendar-card .grid-footer {
+      border-left: var(--border-width) solid var(--color-primary);
+    }
+
+    .calendar-card .bg-primary {
+      background-color: var(--color-primary);
+      color: var(--color-white);
+    }
+
+    .calendar-card .text-white {
+      color: var(--color-white);
+    }
+
+    .calendar-card .grid-header {
+      grid-area: 1 / 1 / 2 / 10;
+
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: visible;
+      background: var(--color-bg-paper);
+    }
+
+    .calendar-card .grid-header svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+      background: var(--color-bg-paper);
+    }
+
+
+    .calendar-card .grid-header svg rect.header-bg {
+      fill: var(--color-bg-paper);
+    }
+
+    .calendar-card .grid-couplet-left {
+      grid-area: 2 / 1 / 3 / 2;
+    }
+
+    .calendar-card .grid-couplet-right {
+      grid-area: 2 / 9 / 3 / 10;
+    }
+
+    .calendar-card .proverb {
+      writing-mode: vertical-lr;
+      font-family: "FZXingKai-S04S", sans-serif;
+      font-size: calc(9.6 * var(--u));
+      justify-self: center;
+      align-self: center;
+      letter-spacing: calc(3 * var(--u));
+      height: 100%;
+    text-align: center;
+    }
+
+    .calendar-card .grid-main-date {
+      grid-area: 2 / 2 / 3 / 9;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .calendar-card .grid-main-date {
+      position: relative;
+      min-width: 0;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .calendar-card .big-date[hidden] {
+      display: none !important;
+    }
+
+    .calendar-card .calendar-template-art {
+      position: absolute;
+      top: 2mm;
+      left: 50%;
+      transform: translateX(-50%);
+      height: calc(100% - 7mm);
+      width: 100%;
+      display: block;
+      object-position: center;
+    }
+
+    .calendar-card .big-date {
+      font-size: calc(100 * var(--u));
+      font-family: Arial, sans-serif;
+      font-weight: bold;
+      line-height: 1;
+      letter-spacing: calc(-7 * var(--u));
+      transform: scaleY(1.1);
+      text-indent: calc(-7 * var(--u));
+    }
+
+    .calendar-card .grid-lunar-date {
+      grid-area: 3 / 1 / 5 / 4;
+      display: flex;
+      flex-direction: column;
+      padding: calc(1.5 * var(--u));
+    }
+
+    .calendar-card .grid-lunar-date .bot,
+    .calendar-card .grid-weekday .bot {
+      flex: 1;
+      min-height: 0;
+      font-family: "STHupo", sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background-color: var(--color-primary);
+      color: var(--color-white);
+      border-radius: calc(1.5 * var(--u));
+      line-height: 1;
+      font-size: calc(13 * var(--u));
+      letter-spacing: calc(1 * var(--u));
+      padding-left: calc(1 * var(--u));
+      padding-bottom: 0;
+      white-space: nowrap;
+    }
+
+    .calendar-card .grid-solar-term {
+      grid-area: 3 / 4 / 5 / 7;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: calc(2 * var(--u));
+      text-align: justify;
+      text-align-last: justify;
+    }
+
+    .calendar-card .grid-solar-term.is-seasonal {
+      flex-direction: column-reverse;
+    }
+
+    .calendar-card .grid-solar-term.is-seasonal .bot {
+      white-space: nowrap;
+    }
+
+    .calendar-card .grid-solar-term .top {
+      font-size: calc(8 * var(--u));
+    }
+
+    .calendar-card .grid-solar-term .bot {
+      font-size: calc(7 * var(--u));
+    }
+
+    .calendar-card .grid-weekday {
+      grid-area: 3 / 7 / 5 / 10;
+      display: flex;
+      flex-direction: column;
+      padding: calc(1.5 * var(--u));
+    }
+
+    .calendar-card .grid-lunar-date .top,
+    .calendar-card .grid-weekday .top {
+      width: 100%;
+      line-height: 1.2;
+      display: block;
+      font-size: calc(6.4 * var(--u));
+      font-weight: bold;
+      text-align: center;
+    }
+
+    .calendar-card .grid-suitable {
+      grid-area: 5 / 1 / 8 / 3;
+      display: flex;
+      flex-direction: column;
+      padding: calc(1.5 * var(--u));
+      align-items: center;
+    }
+
+    .calendar-card .oval-icon {
+      width: calc(19 * var(--u));
+      height: calc(9 * var(--u));
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: calc(6.4 * var(--u));
+      flex-shrink: 0;
+      font-weight: bold;
+      line-height: 1;
+    }
+
+    .calendar-card .yiji-items {
+      display: flex;
+      flex-direction: row;
+      font-size: calc(6.4 * var(--u));
+      flex-wrap: wrap;
+      flex: 1;
+      align-items: center;
+    }
+
+    .calendar-card .yiji-items span {
+      width: 50%;
+      box-sizing: border-box;
+      text-align: center;
+    }
+
+    .calendar-card .grid-time-fortune {
+      grid-area: 5 / 3 / 6 / 8;
+
+      display: flex;
+      flex-direction: column;
+      padding: 0 calc(3 * var(--u));
+      justify-content: center;
+    }
+
+    .calendar-card .shichen-label {
+      margin-right: calc(1.5 * var(--u));
+      font-weight: bold;
+    }
+
+    .calendar-card .steel-row {
+      display: flex;
+      align-items: center;
+      font-size: calc(6.4 * var(--u));
+      justify-content: space-between;
+    }
+
+    .calendar-card .char {
+      display: block;
+      text-align: justify;
+      text-align-last: justify;
+      width: 100%;
+      line-height: 1.3;
+    }
+
+    .calendar-card .grid-avoid {
+      grid-area: 5 / 8 / 7 / 10;
+
+      display: flex;
+      flex-direction: column;
+      padding: calc(1.5 * var(--u));
+      align-items: center;
+    }
+
+    .calendar-card .grid-avoid .yiji-items {
+      justify-content: space-around;
+    }
+
+    .calendar-card .grid-nine-stars {
+      grid-area: 7 / 8 / 9 / 10;
+
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: calc(6.4 * var(--u));
+    }
+
+    .calendar-card .grid-conflict {
+      grid-area: 9 / 8 / 11 / 10;
+
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      padding: calc(1.5 * var(--uh)) 0;
+    }
+
+    .calendar-card .snake-icon {
+      flex: 1;
+      position: relative;
+      align-self: stretch;
+      margin: 0 calc(1.5 * var(--u));
+      font-family: "ShengXiao1", "Microsoft YaHei", "PingFang SC", "Noto Sans SC", sans-serif;
+      font-weight: normal;
+      line-height: 1;
+    }
+
+    .calendar-card .snake-icon .sx-day,
+    .calendar-card .snake-icon .sx-clash {
+      position: absolute;
+      display: block;
+      line-height: 1;
+    }
+
+    .calendar-card .snake-icon .sx-day {
+      top: 0;
+      left: 0;
+      font-size: calc(18 * var(--u));
+      transform-origin: center;
+    }
+
+    .calendar-card .snake-icon .sx-clash {
+      right: 0;
+      bottom: 0;
+      font-size: calc(15 * var(--u));
+      transform: scaleX(-1);
+    }
+
+    .calendar-card .violet-text {
+      font-size: calc(4 * var(--u));
+      white-space: nowrap;
+    }
+
+    .calendar-card .grid-year-month {
+      grid-area: 11 / 8 / 12 / 10;
+
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: calc(6.4 * var(--u));
+      letter-spacing: calc(1 * var(--u));
+      padding-left: calc(1 * var(--u));
+
+    }
+
+    .calendar-card .grid-auspicious-gods {
+      grid-area: 6 / 3 / 11 / 5;
+      display: flex;
+      font-size: calc(6.4 * var(--u));
+      padding: calc(1.5 * var(--u));
+      justify-content: center;
+    }
+
+
+    .calendar-card .grid-auspicious-gods #t-gods,
+    [data-ref="t-gods"] {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .calendar-card .grid-auspicious-gods .header {
+      border-radius: calc(1.5 * var(--u));
+      font-weight: bold;
+
+      line-height: 1.44 !important;
+      padding-top: 0.057em;
+    }
+
+    .calendar-card .grid-auspicious-gods .item {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+    }
+
+    .calendar-card .grid-auspicious-gods .god-label,
+    .calendar-card .grid-auspicious-gods .god-dir {
+      line-height: 1;
+    }
+
+    .calendar-card .grid-feixing {
+      grid-area: 6 / 5 / 10 / 6;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1mm;
+    }
+
+    .calendar-card .grid-feixing svg {
+      display: block;
+      width: 100%;
+      height: auto;
+      aspect-ratio: 1 / 1;
+      overflow: visible;
+      font-family: "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", sans-serif;
+    }
+
+    .calendar-card .grid-five-elements {
+      grid-area: 6 / 6 / 10 / 8;
+
+      display: flex;
+      flex-direction: column;
+      padding: calc(1.5 * var(--u));
+    }
+
+    .calendar-card .grid-five-elements .row {
+      flex: 1;
+      display: flex;
+      font-size: calc(4 * var(--u));
+      align-items: center;
+      gap: calc(1.8 * var(--u));
+      min-height: 0;
+    }
+
+    .calendar-card .grid-five-elements .label {
+      flex: 1;
+      min-width: 0;
+      text-align: justify;
+      text-align-last: justify;
+      display: block;
+      border-bottom: var(--border-width) solid var(--color-primary-light);
+      white-space: nowrap;
+    }
+
+    .calendar-card .grid-five-elements .val1 {
+      text-align: center;
+      transform: scaleY(0.85);
+      transform-origin: center;
+      font-weight: bold;
+      font-size: calc(6.4 * var(--u));
+    }
+
+    .calendar-card .grid-five-elements .val2 {
+      flex: 1;
+      min-width: 0;
+      text-align: justify;
+      text-align-last: justify;
+      display: block;
+      border-bottom: var(--border-width) solid var(--color-primary-light);
+    }
+
+    .calendar-card .grid-five-elements>.row:nth-last-child(-n + 2) .val2 {
+      text-align: center !important;
+      text-align-last: center !important;
+    }
+
+    .calendar-card .grid-bazi {
+      grid-area: 10 / 5 / 12 / 6;
+
+    }
+
+    .calendar-card .grid-fetus-spirit {
+      grid-area: 10 / 6 / 12 / 8;
+
+    }
+
+
+    .calendar-card .bazi-box {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+
+      padding: calc(1.5 * var(--u));
+      height: 100%;
+      gap: calc(1.5 * var(--u));
+      font-size: calc(5.5 * var(--u));
+    }
+
+    .calendar-card .bazi-header {
+      writing-mode: vertical-rl;
+      white-space: nowrap;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: calc(1 * var(--u));
+      height: 100%;
+      text-align: center;
+      line-height: 1.2;
+
+      padding: 0 calc(0.8 * var(--u));
+      padding-top: calc(0.6 * var(--u));
+
+      flex-shrink: 0;
+      letter-spacing: calc(0.6 * var(--u));
+    }
+
+
+    .calendar-card .grid-bazi .bazi-header {
+      padding-left: calc(0.8 * var(--u) - 0.048em);
+      padding-right: calc(0.8 * var(--u) + 0.048em);
+    }
+
+    .calendar-card .grid-fetus-spirit .bazi-header {
+      padding-left: calc(0.8 * var(--u) - 0.016em);
+      padding-right: calc(0.8 * var(--u) + 0.016em);
+
+      padding-top: calc(0.6 * var(--u) + 0.032em);
+    }
+
+
+    .calendar-card .bg-primary .ink {
+      display: block;
+    }
+
+    .calendar-card .grid-bazi .bazi {
+      display: grid;
+      grid-template-columns: repeat(2, max-content);
+      gap: calc(1.5 * var(--u));
+      align-items: center;
+    }
+
+    .calendar-card .grid-bazi .bazi>div {
+      white-space: nowrap;
+      line-height: 1.2;
+    }
+
+    .calendar-card .grid-fetus-spirit .bazi {
+      flex: 1;
+      min-width: 0;
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: calc(1.5 * var(--u));
+    }
+
+    .calendar-card .grid-fetus-spirit .bazi>div {
+      text-align: justify;
+      text-align-last: justify;
+      white-space: nowrap;
+    }
+
+    .calendar-card .grid-fetus-spirit .bazi {
+      grid-template-columns: 1fr;
+    }
+
+    .calendar-card .grid-fetus-spirit .bazi>div {
+      text-align: justify;
+      text-align-last: justify;
+      white-space: nowrap;
+    }
+
+    .calendar-card .grid-zodiac-wrap {
+      grid-area: 8 / 1 / 11 / 3;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: 1fr 1fr;
+    }
+
+    .calendar-card .animal-cell {
+      position: relative;
+      padding: calc(0.65 * var(--u));
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .calendar-card .animal-nums {
+      display: flex;
+      justify-content: space-between;
+      font-size: calc(3 * var(--u));
+    }
+
+    .calendar-card .animal-icon {
+      position: absolute;
+      font-size: calc(9 * var(--u));
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-family: "ShengXiao", "Microsoft YaHei", "PingFang SC", "Noto Sans SC", sans-serif;
+      font-weight: normal;
+      line-height: 1;
+    }
+
+    .calendar-card .grid-lucky-numbers {
+      grid-area: 11 / 1 / 12 / 5;
+      display: flex;
+      align-items: center;
+      font-size: calc(6 * var(--u));
+      padding: 0 calc(2 * var(--u));
+      gap: calc(1.5 * var(--u));
+    }
+
+    .calendar-card .grid-lucky-numbers .header {
+
+      padding: calc(1 * var(--u) - 0.077em) calc(1 * var(--u)) calc(1 * var(--u) + 0.077em);
+      border-radius: calc(0.5 * var(--u));
+      line-height: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .calendar-card .grid-lucky-numbers .zodiac {
+      display: flex;
+    }
+
+    .calendar-card .grid-lucky-numbers span {
+      font-size: calc(4.2 * var(--u));
+      line-height: 1;
+      font-family: Arial, sans-serif;
+      transform: translateY(calc(0.4 * var(--u)));
+
+    }
+
+    .calendar-card .grid-footer {
+      grid-area: 12 / 1 / 13 / 10;
+      display: flex;
+      align-items: center;
+      padding: 0 calc(3 * var(--u));
+      font-size: calc(5.5 * var(--u));
+      justify-content: space-between;
+    }
+
+    .calendar-card .grid-footer>div {
+      white-space: nowrap;
+      flex: 0 0 auto;
+    }
+
+    .calendar-card .grid-footer #t-dream,
+    [data-ref="t-dream"] {
+      flex: 0 1 auto;
+      min-width: 50%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+
+    #print-root {
+      display: none;
+    }
+
+    @media print {
+
+
+      #print-root {
+        display: none !important;
+      }
+
+
+      html[data-print-ready="1"],
+      html[data-print-ready="1"] body {
+        display: block !important;
+        width: auto !important;
+        min-height: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        overflow: visible !important;
+        background: #fff !important;
+        place-items: initial !important;
+      }
+
+      html[data-print-ready="1"] body>*:not(#print-root) {
+        display: none !important;
+      }
+
+      html[data-print-ready="1"] #print-root {
+        display: block !important;
+      }
+
+      .print-page {
+        position: relative;
+        width: 100%;
+
+        height: calc(var(--print-sheet-h, 200mm) - 0.1mm);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        break-inside: avoid;
+        page-break-inside: avoid;
+        break-after: page;
+        page-break-after: always;
+      }
+
+      .print-page:last-child {
+        break-after: auto;
+        page-break-after: auto;
+      }
+
+
+      .print-page .calendar-card {
+        flex: 0 0 auto;
+
+        width: var(--page-w-mm, 155mm);
+        height: var(--page-h-mm, 200mm);
+
+        width: min(var(--page-w-mm, 155mm), 100vw);
+        height: auto;
+        aspect-ratio: var(--page-ratio, 155 / 200);
+      }
+
+      #print-root *,
+      #print-root *::before,
+      #print-root *::after {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+    }
+  </style>
+
+
+  <style id="print-paper">
+    @page {
+      size: 155mm 200mm;
+      margin: 0;
+    }
+  </style>
+
+
+  <style id="print-alias"></style>
+</head>
+
+<body>
+  <div class="export-overlay" id="export-overlay" role="alertdialog" aria-modal="true"
+    aria-labelledby="export-overlay-title" hidden>
+    <div class="export-overlay__box">
+      <div class="export-overlay__title" id="export-overlay-title">正在生成打印页面…</div>
+      <div class="export-overlay__bar"><i id="export-overlay-fill"></i></div>
+      <div class="export-overlay__meta">
+        <span id="export-overlay-progress">0 / 0</span>
+        <button type="button" id="btn-export-cancel">取消</button>
+      </div>
+    </div>
+  </div>
+
+  <main class="app" aria-label="可翻页、可撕纸的老黄历">
+    <div id="book-space">
+      <button type="button" class="nav-btn nav-prev" id="btn-prev" aria-label="回退到前一天" title="回退（← 键）">‹</button>
+      <button type="button" class="nav-btn nav-next" id="btn-next" aria-label="翻到后一天" title="翻页（→ 键 / 空格）">›</button>
+
+      <div id="book" tabindex="0" role="group" aria-label="老黄历" data-state="idle">
+        <canvas id="next-page" class="resting-page" aria-hidden="true"></canvas>
+        <canvas id="current-page" class="resting-page" aria-hidden="true"></canvas>
+        <div id="page-loader" class="page-loader" role="status" aria-label="正在生成日历"></div>
+        <canvas id="paper-canvas" class="motion-canvas" aria-hidden="true" hidden></canvas>
+        <canvas id="tear-canvas" class="motion-canvas" aria-hidden="true" hidden></canvas>
+        <div id="bar" aria-hidden="true"></div>
+        <div id="roll" class="rolled-top" aria-hidden="true" hidden>
+          <canvas id="roll-canvas"></canvas>
+        </div>
+      </div>
+
+
+      <div class="book-tabs" id="book-tabs" role="group" aria-label="日历工具">
+        <div class="tab-slot">
+          <button type="button" class="tab-btn" id="btn-date" aria-haspopup="dialog" aria-expanded="false"
+            aria-controls="date-panel" aria-label="跳转日期" title="跳转日期">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6"
+              aria-hidden="true">
+              <rect x="3" y="5" width="18" height="16" rx="2" />
+              <path d="M7 2v6m10-6v6M3 11h18" />
+            </svg>
+          </button>
+        </div>
+        <div class="tab-slot">
+          <button type="button" class="tab-btn" id="btn-export" aria-haspopup="dialog" aria-expanded="false"
+            aria-controls="export-panel" aria-label="导出日历" title="导出日历（E 键）">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6"
+              aria-hidden="true">
+              <path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5" />
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <p id="announcement" class="sr-only" role="status" aria-live="polite"></p>
+    <noscript>请启用 JavaScript，以体验日历翻页与撕纸。</noscript>
+  </main>
+
+
+  <section class="dock-panel date-panel" id="date-panel" role="dialog" aria-labelledby="date-panel-title" hidden inert>
+    <div class="dock-content">
+      <header class="dock-header">
+        <h2 id="date-panel-title">跳转日期</h2>
+        <button type="button" class="dock-close" id="btn-date-close" aria-label="关闭日期面板">×</button>
+      </header>
+      <span class="dock-label" id="date-picker-label">选择年月日</span>
+      <input type="hidden" id="date-picker" />
+      <div class="date-picker-host" id="date-picker-ui" role="group" aria-labelledby="date-picker-label"></div>
+      <p class="dock-help">1900—2099 年 · 选好年月日后，点击前往日期</p>
+      <div class="date-actions">
+        <button type="button" id="btn-today" title="回到今天（R 键）">回到今天</button>
+        <button type="button" class="primary" id="btn-date-go">前往日期</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="dock-panel export-panel" id="export-panel" role="dialog" aria-labelledby="export-panel-title" hidden
+    inert>
+    <div class="dock-content">
+      <header class="dock-header">
+        <h2 id="export-panel-title">导出日历</h2>
+        <button type="button" class="dock-close" id="btn-export-close" aria-label="关闭导出面板">×</button>
+      </header>
+      <div class="export-seg" aria-label="导出范围">
+        <button type="button" aria-pressed="true" data-range="day">当日</button>
+        <button type="button" aria-pressed="false" data-range="month">当月</button>
+        <button type="button" aria-pressed="false" data-range="year">当年</button>
+        <button type="button" aria-pressed="false" data-range="custom">自定义</button>
+      </div>
+      <div class="export-custom" id="export-custom" hidden>
+        <div class="date-field">
+          <span id="export-start-label">开始日期</span>
+          <input type="hidden" id="export-start" />
+          <div class="date-picker-host" id="export-start-ui" role="group" aria-labelledby="export-start-label"></div>
+        </div>
+        <div class="date-field">
+          <span id="export-end-label">结束日期</span>
+          <input type="hidden" id="export-end" />
+          <div class="date-picker-host" id="export-end-ui" role="group" aria-labelledby="export-end-label"></div>
+        </div>
+      </div>
+      <p class="export-summary" id="export-summary"></p>
+      <div class="export-actions">
+        <button type="button" class="primary" id="btn-export-run">导出</button>
+      </div>
+      <p class="export-status" id="export-status" role="status" aria-live="polite"></p>
+    </div>
+  </section>
+
+  <div id="tex-host" aria-hidden="true">
+    <div class="calendar-card" id="tpl">
+      <div class="grid-header">
+
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 96" width="100%" height="100%"
+          preserveAspectRatio="none" style="overflow: visible; background: #fdfcf7">
+
+          <rect class="header-bg" x="-4" y="-4" width="968" height="104" fill="#fdfcf7" stroke="none" />
+          <g id="t-header-graphics" fill="none" stroke="#1B5E20">
+
+            <path d="M 380 10 L 2 10 L 2 86 L 380 86" fill="none" stroke="#1B5E20" stroke-width="2.2"
+              stroke-linecap="square" />
+            <path d="M 389 1 L 571 1 L 580 10 L 580 86 L 571 95 L 389 95 L 380 86 L 380 10 Z" fill="none"
+              stroke="#1B5E20" stroke-width="2.2" />
+            <path d="M 580 10 L 958 10 L 958 86 L 580 86" fill="none" stroke="#1B5E20" stroke-width="2.2"
+              stroke-linecap="square" />
+            <g id="t-corners"></g>
+
+            <text x="200" y="49" id="t-en" fill="#1B5E20" stroke="none" font-weight="900" text-anchor="middle"
+              dominant-baseline="central" font-family="'Playfair Display','Cinzel',serif" font-size="60"
+              letter-spacing="1.5">
+              SEPTEMBER
+            </text>
+            <text x="480" y="49" id="t-year" fill="#1B5E20" stroke="none" font-weight="900" text-anchor="middle"
+              dominant-baseline="central" font-family="'Playfair Display','Georgia',serif" font-size="68"
+              font-style="italic" letter-spacing="-1">
+              2026
+            </text>
+            <text x="760" y="49" id="t-cn" fill="#1B5E20" stroke="none" font-weight="900" text-anchor="middle"
+              dominant-baseline="central" font-family="'Playfair Display','Cinzel',serif" font-size="60"
+              letter-spacing="1.5">
+              九月小
+            </text>
+          </g>
+        </svg>
+      </div>
+
+      <div class="grid-couplet-left proverb" id="t-cpl-l">好言一句三冬暖</div>
+      <div class="grid-main-date">
+        <div class="big-date" id="t-day">4</div>
+      </div>
+      <div class="grid-couplet-right proverb" id="t-cpl-r">话不投机六月寒</div>
+
+      <div class="grid-lunar-date table-cell">
+        <div class="top" id="t-lun-top">农历丙午年七月小</div>
+        <div class="bot bg-primary" id="t-lun-bot"><span class="ink">廿三日</span></div>
+      </div>
+      <div class="grid-solar-term table-cell">
+        <div class="top" id="t-term-top">廿六白露</div>
+        <div class="bot" id="t-term-bot">9月7日</div>
+      </div>
+      <div class="grid-weekday table-cell">
+        <div class="top" id="t-wk-en">FRIDAY</div>
+        <div class="bot bg-primary" id="t-wk-cn"><span class="ink">星期五</span></div>
+      </div>
+
+      <div class="grid-suitable table-cell">
+        <div class="oval-icon bg-primary text-white"><span class="ink">宜</span></div>
+        <div class="yiji-items" id="t-yi"><span class="yi-0">祈福</span><span class="yi-1">入学</span><span
+            class="yi-2"></span><span class="yi-3"></span><span class="yi-4"></span><span class="yi-5"></span></div>
+      </div>
+      <div class="grid-time-fortune table-cell">
+        <div class="steel-row">
+          <div class="char"><span class="shichen-label">时辰</span>子丑寅卯辰巳午未申酉戌亥</div>
+        </div>
+        <div class="steel-row">
+          <div class="char" id="t-luck"><span class="shichen-label">吉凶</span><span id="t-luck-row">中吉吉凶中吉吉吉中凶凶凶</span>
+          </div>
+        </div>
+      </div>
+      <div class="grid-avoid table-cell">
+        <div class="oval-icon bg-primary text-white"><span class="ink">忌</span></div>
+        <div class="yiji-items" id="t-ji"><span class="ji-0">出行</span><span class="ji-1">伐木</span><span
+            class="ji-2"></span><span class="ji-3"></span></div>
+      </div>
+      <div class="grid-nine-stars table-cell" id="t-nine">九星四绿</div>
+      <div class="grid-conflict table-cell">
+        <div class="snake-icon" id="t-cf-icon"><span class="sx-day" id="t-cf-day">蛇</span><span class="sx-clash"
+            id="t-cf-clash">猪</span></div>
+        <div class="violet-text" id="t-cf-text">蛇日冲猪生年32岁</div>
+      </div>
+      <div class="grid-year-month table-cell" id="t-ym">马年猴月</div>
+
+      <div class="grid-auspicious-gods table-cell">
+        <div id="t-gods">
+          <div class="header bg-primary text-white item"><span class="ink">吉神方位</span></div>
+          <div class="item"><span class="god-label">喜神</span><span class="god-dir" id="t-god-xi">西南</span></div>
+          <div class="item"><span class="god-label">财神</span><span class="god-dir" id="t-god-cai">正东</span></div>
+          <div class="item"><span class="god-label">贵神</span><span class="god-dir" id="t-god-yang">东北</span></div>
+          <div class="item"><span class="god-label">吉门</span><span class="god-dir" id="t-god-gate">--</span></div>
+        </div>
+      </div>
+      <div class="grid-feixing table-cell">
+        <svg xmlns="http://www.w3.org/2000/svg" id="t-feixing"></svg>
+      </div>
+      <div class="grid-five-elements table-cell">
+        <div class="row">
+          <div class="label">天干</div>
+          <div class="val1" id="t-gan">辛</div>
+          <div class="val2" id="t-gan-el">属金</div>
+        </div>
+        <div class="row">
+          <div class="label">地支</div>
+          <div class="val1" id="t-zhi">巳</div>
+          <div class="val2" id="t-zhi-el">属火</div>
+        </div>
+        <div class="row">
+          <div class="label">纳音</div>
+          <div class="val1" id="t-nayin">金</div>
+          <div class="val2" id="t-nayin-el">属金</div>
+        </div>
+        <div class="row">
+          <div class="label">廿八宿</div>
+          <div class="val1" id="t-xiu">娄</div>
+          <div class="val2">宿</div>
+        </div>
+        <div class="row">
+          <div class="label">十二神</div>
+          <div class="val1" id="t-zx">收</div>
+          <div class="val2">日</div>
+        </div>
+      </div>
+      <div class="grid-bazi table-cell">
+        <div class="bazi-box">
+          <div class="bazi-header bg-primary text-white"><span class="ink">八字</span></div>
+          <div class="bazi" id="t-bazi">
+            <div>丙午</div>
+            <div>丙申</div>
+            <div>辛巳</div>
+            <div>戊子</div>
+          </div>
+        </div>
+      </div>
+      <div class="grid-fetus-spirit table-cell">
+        <div class="bazi-box">
+          <div class="bazi-header bg-primary text-white"><span class="ink">胎神</span></div>
+          <div class="bazi" id="t-tai">
+            <div>厨灶床</div>
+            <div>外正西</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid-zodiac-wrap" id="t-z-wrap">
+        <div class="grid-zodiac-1 table-cell animal-cell" id="t-z1">
+          <div class="animal-nums"><span class="n-0">--</span><span class="n-1">--</span></div>
+          <div class="animal-nums"><span class="n-2">--</span><span class="n-3">--</span></div>
+          <div class="animal-icon">牛</div>
+        </div>
+        <div class="grid-zodiac-2 table-cell animal-cell" id="t-z2">
+          <div class="animal-nums"><span class="n-0">--</span><span class="n-1">--</span></div>
+          <div class="animal-nums"><span class="n-2">--</span><span class="n-3">--</span></div>
+          <div class="animal-icon">兔</div>
+        </div>
+        <div class="grid-zodiac-3 table-cell animal-cell" id="t-z3">
+          <div class="animal-nums"><span class="n-0">--</span><span class="n-1">--</span></div>
+          <div class="animal-nums"><span class="n-2">--</span><span class="n-3">--</span></div>
+          <div class="animal-icon">龙</div>
+        </div>
+        <div class="grid-zodiac-4 table-cell animal-cell" id="t-z4">
+          <div class="animal-nums"><span class="n-0">--</span><span class="n-1">--</span></div>
+          <div class="animal-nums"><span class="n-2">--</span><span class="n-3">--</span></div>
+          <div class="animal-icon">马</div>
+        </div>
+      </div>
+
+      <div class="grid-lucky-numbers table-cell">
+        <div class="header bg-primary text-white"><span class="ink">吉数</span></div>
+        <div class="zodiac" id="t-lucky-zx">—</div>
+        <span id="t-lucky-num">—</span>
+      </div>
+      <div class="grid-footer table-cell">
+        <div id="t-dream">梦见: 未婚女子梦见暴风, 婚姻自主</div>
+        <div id="t-tide-rise">涨潮 10:20 分</div>
+        <div id="t-tide-fall">落潮 03:20 分</div>
+      </div>
+    </div>
+  </div>
+
+
+  <div id="print-root" aria-hidden="true"></div>
+
+  <script>
+    // 页面尺寸与交互状态必须保持同步。
+    (() => {
+      "use strict";
+      const $ = (id) => document.getElementById(id);
+      const TAU = Math.PI * 2;
+      const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
+      const lerp = (a, b, t) => a + (b - a) * t;
+      const smoothstep = (a, b, n) => {
+        const t = clamp((n - a) / (b - a), 0, 1);
+        return t * t * (3 - 2 * t);
+      };
+      const easeInOut = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+      const easeOut = (t) => 1 - Math.pow(1 - t, 3);
+      const noise = (seed) => {
+        const n = Math.sin(seed * 12.9898 + 78.233) * 43758.5453;
+        return n - Math.floor(n);
+      };
+      const pad = (n) => (n < 10 ? "0" : "") + n;
+      const motionPreference = matchMedia("(prefers-reduced-motion: reduce)");
+
+
+      const CONFIG = {
+        PAGE: {                          // 纸页尺寸与视图布局配置
+          WIDTH_MM: 155,                 // 单页物理宽度 (毫米)
+          HEIGHT_MM: 200,                // 单页物理高度 (毫米)
+          BASE_WIDTH: 420,               // 页面基准显示宽度 (像素)
+          TEX_WIDTH: 768,                // 交互纹理上限；静止页与动画共用 Canvas 缓存，导出另走高清路径
+          VIEW_PADDING: {                // 3D翻页画布留白边距 (像素)
+            left: 150,                   // 画布左侧留白
+            top: 680,                    // 画布顶部留白 (预留向上飞出空间)
+            right: 150,                  // 画布右侧留白
+            bottom: 150,                 // 画布底部留白
+          },
+        },
+        PRECISION: {                     // 控制精度与几何细分参数
+          MESH_ROWS: 96,                 // WebGL纸张物理网格行数 (曲面细分)
+          MESH_COLUMNS: 10,              // WebGL纸张物理网格列数 (横向细分)
+          MESH_ROWS_FALLBACK: 48,        // 2D降级模式网格行数
+          MESH_COLUMNS_FALLBACK: 4,      // 2D降级模式网格列数
+          ROLL_SEGMENTS: 36,             // 顶部卷轴3D圆弧细分段数
+          ROLL_STRIPS: 40,               // 顶部卷轴2D纹理切片条数
+          TEAR_STEP: 6,                  // 撕纸边缘轮廓采样步长 (像素)
+          SOLVER_ITERATIONS: 15,         // 翻页抓取高度二分法求解迭代次数
+        },
+        ANIMATION: {                     // 交互与过渡动画时长 (毫秒)
+          FLIP_COMPLETE_DURATION: 700,   // 完整翻页基准时长
+          FLIP_CANCEL_DURATION: 240,     // 翻页未达阈值回弹时长
+          FLIP_REDUCED_MOTION: 130,      // 减弱动态模式速翻时长
+          ROLL_BACK_DURATION: 420,       // 卷轴下拉回退上一页时长
+          ROLL_CANCEL_DURATION: 260,     // 卷轴未达阈值复位时长
+          TEAR_COMPLETE_DURATION: 420,   // 撕纸成功飞出动画时长
+          TEAR_CANCEL_DURATION: 300,     // 撕纸取消回弹复位时长
+          TEAR_REDUCED_MOTION: 160,      // 撕纸减弱动态模式时长
+          PAGE_TURN_SLOW_DURATION: 570,  // 日期跳转倒退翻页平滑时长
+        },
+        APPEARANCE: {                    // 物理外观、材质、透视与交互阈值
+          BACKFACE_OPACITY: 0.18,        // 纸张背面透明度/透墨深度 (0~1)
+          BACKFACE_COLOR: "#f0ede5",     // 纸张背面基底纯色
+          PAPER_COLOR: "#fdfcf7",        // 纸张正面默认底色
+          PERSPECTIVE: 2200,             // 3D透视视距参数
+          HINGE_HEIGHT: 8,               // 顶部装订铁夹高度 (像素)
+          ROLL_OFFSET: 8,                // 卷轴覆盖顶部压条向下偏移 (像素)
+          BASE_RADIUS: 7.5,              // 卷轴初始曲率半径 (像素)
+          THICKNESS_PER_PAGE: 1.05,      // 单页纸张卷入增加厚度 (像素)
+          SKIN: 0.6,                     // 纸张弯曲表面与卷轴间隙量 (像素)
+          MAX_ROLL_PAGES: 10,            // 卷轴视觉渲染最大累积层数
+          DRAG_LIMIT: 0.38,              // 手动拖拽翻页最大行程比例
+          ROLL_DRAG_FACTOR: 0.58,        // 卷轴向下拉动触发回翻换算系数
+          TEAR_THRESHOLD_RATIO: 0.15,    // 触发完整撕页的拖拽距离比例阈值
+        },
+      };
+
+      const PAGE_W_MM = CONFIG.PAGE.WIDTH_MM;
+      const PAGE_H_MM = CONFIG.PAGE.HEIGHT_MM;
+      const SIZE = { width: CONFIG.PAGE.BASE_WIDTH, height: (CONFIG.PAGE.BASE_WIDTH * PAGE_H_MM) / PAGE_W_MM };
+      const TEX = { width: CONFIG.PAGE.TEX_WIDTH, height: Math.round((CONFIG.PAGE.TEX_WIDTH * PAGE_H_MM) / PAGE_W_MM) };
+      const NATIVE_TEX = { width: (PAGE_W_MM * 96) / 25.4, height: (PAGE_H_MM * 96) / 25.4 };
+
+      const TEX_CAPTURE_SCALE = CONFIG.PAGE.TEX_WIDTH / NATIVE_TEX.width;
+      const VIEW = {
+        left: CONFIG.PAGE.VIEW_PADDING.left,
+        top: CONFIG.PAGE.VIEW_PADDING.top,
+        right: CONFIG.PAGE.VIEW_PADDING.right,
+        bottom: CONFIG.PAGE.VIEW_PADDING.bottom,
+        width: SIZE.width + CONFIG.PAGE.VIEW_PADDING.left + CONFIG.PAGE.VIEW_PADDING.right,
+        height: SIZE.height + CONFIG.PAGE.VIEW_PADDING.top + CONFIG.PAGE.VIEW_PADDING.bottom,
+      };
+
+      const docStyle = document.documentElement.style;
+      docStyle.setProperty("--page-w-mm", PAGE_W_MM + "mm");
+      docStyle.setProperty("--page-h-mm", PAGE_H_MM + "mm");
+      docStyle.setProperty("--page-ratio", `${PAGE_W_MM} / ${PAGE_H_MM}`);
+      docStyle.setProperty("--book-h", `${SIZE.height}px`);
+      docStyle.setProperty("--book-w-factor", (PAGE_W_MM / PAGE_H_MM).toFixed(6));
+
+      const rollMargin = (parseFloat(getComputedStyle($("tpl")).paddingTop) * SIZE.width) / NATIVE_TEX.width;
+      const rollScale = Math.min(
+        1,
+        Math.max(CONFIG.APPEARANCE.HINGE_HEIGHT * 2 + 4, rollMargin - 4) /
+        (2 * (CONFIG.APPEARANCE.BASE_RADIUS + CONFIG.APPEARANCE.MAX_ROLL_PAGES * CONFIG.APPEARANCE.THICKNESS_PER_PAGE))
+      );
+      const radiusAt = (count) =>
+        (CONFIG.APPEARANCE.BASE_RADIUS + clamp(count, 0, CONFIG.APPEARANCE.MAX_ROLL_PAGES) * CONFIG.APPEARANCE.THICKNESS_PER_PAGE) * rollScale;
+
+      function rollMetrics(count) {
+        const layers = clamp(count, 0, CONFIG.APPEARANCE.MAX_ROLL_PAGES);
+        const opacity = clamp(count, 0, 1);
+        const radius = lerp(CONFIG.APPEARANCE.HINGE_HEIGHT / 2, radiusAt(layers), opacity);
+        return { layers, radius, axis: radius, height: radius * 2, opacity };
+      }
+
+
+      const HAS_LUNAR = typeof window.Solar !== "undefined";
+
+      const ICON_FONTS = [
+        { family: "ShengXiao", file: "shengxiao.ttf" },
+        { family: "ShengXiao1", file: "shengxiao1.ttf" },
+        { family: "FZXingKai-S04S", file: "./FZXingKai-S04S.woff2" },
+        { family: "STHupo", file: "./STHupo.woff2" },
+      ];
+      const EN_MONTH = new Intl.DateTimeFormat("en-US", { month: "long", timeZone: "UTC" });
+      const EN_WEEKDAY = new Intl.DateTimeFormat("en-US", { weekday: "long", timeZone: "UTC" });
+      const utcDate = (y, m, d) => new Date(Date.UTC(y, m - 1, d));
+
+      const TIDE = {};
+      [
+        [1, "06:05", "10:30"],
+        [2, "06:30", "11:00"],
+        [3, "07:25", "11:40"],
+        [4, "07:50", "12:20"],
+        [5, "08:30", "13:00"],
+        [6, "09:00", "13:40"],
+        [7, "09:40", "14:30"],
+        [8, "10:20", "15:20"],
+        [9, "11:30", "16:30"],
+        [10, "12:20", "17:40"],
+        [11, "13:50", "18:40"],
+        [12, "15:00", "19:30"],
+        [13, "04:10", "08:20"],
+        [14, "05:10", "09:10"],
+        [15, "05:50", "09:50"],
+      ].forEach((r) => {
+        TIDE[r[0]] = [r[1], r[2]];
+        TIDE[r[0] + 15] = [r[1], r[2]];
+      });
+
+      const FEIXING = {
+        FLY_ORDER: ["中", "乾", "兑", "艮", "离", "坎", "坤", "震", "巽"],
+        RING: ["坎", "艮", "震", "巽", "离", "坤", "兑", "乾"],
+        R_OUTER: 254, // 外八边形顶点半径
+        R_INNER: 158, // 内八边形顶点半径
+        R_TAIJI: 60, // 中心太极半径
+        STROKE: { outer: 5, inner: 5, spoke: 5 },
+        FONT_SIZE: 60,
+      };
+
+      FEIXING.HALF = Math.ceil(FEIXING.R_OUTER * Math.cos(Math.PI / 8) + FEIXING.STROKE.outer / 2);
+      FEIXING.VIEWBOX = `${-FEIXING.HALF} ${-FEIXING.HALF} ${FEIXING.HALF * 2} ${FEIXING.HALF * 2}`;
+
+      function todayCN() {
+        try {
+          const p = new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Shanghai", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date());
+          const pick = (t) => (p.find((x) => x.type === t) || { value: "1" }).value;
+          return `${pick("year")}-${pick("month")}-${pick("day")}`;
+        } catch (e) {
+          const d = new Date();
+          return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+        }
+      }
+      function shiftDate(dateStr, days) {
+        if (HAS_LUNAR) {
+          const a = dateStr.split("-");
+          return window.Solar.fromYmd(+a[0], +a[1], +a[2]).next(days).toYmd();
+        }
+        const d = new Date(dateStr);
+        d.setDate(d.getDate() + days);
+        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+      }
+      function daysBetween(a, b) {
+        if (HAS_LUNAR) {
+          const x = a.split("-"),
+            y = b.split("-");
+          return window.Solar.fromYmd(+x[0], +x[1], +x[2]).subtract(window.Solar.fromYmd(+y[0], +y[1], +y[2]));
+        }
+        return Math.round((new Date(a) - new Date(b)) / 86400000);
+      }
+
+
+      // 统一日期下限：日期选择、翻页与导出均允许访问往年日期。
+      const FIRST_DATE = "1900-01-01";
+      const MAX_DATE = "2099-12-31";
+      const TODAY_DATE = (() => {
+        const t = todayCN();
+        return t >= FIRST_DATE && t <= MAX_DATE ? t : FIRST_DATE;
+      })();
+      const BASE_DATE = FIRST_DATE;
+      const TODAY_INDEX = daysBetween(TODAY_DATE, BASE_DATE);
+      const MIN_INDEX = 0;
+      const MAX_INDEX = daysBetween(MAX_DATE, BASE_DATE);
+      const dateOf = (index) => shiftDate(BASE_DATE, index);
+
+
+      const EPOCH_DATE = "1900-01-01";
+      const serialOf = (dateStr) => daysBetween(dateStr, EPOCH_DATE);
+
+
+      const DAILY_TEXT = {
+        couplet: {
+          file: "couplets.json", // 每条为 [上联, 下联]
+          items: [],
+          fallback: ["好言一句三冬暖", "话不投机六月寒"], // 文件加载失败时的兜底
+          normalize: (x) => (Array.isArray(x) && x.length >= 2 ? [String(x[0]).trim(), String(x[1]).trim()] : null),
+        },
+        dream: {
+          file: "jiemeng.json", // 每条为 ["梦见……"]
+          items: [],
+          fallback: "梦见: 登高望远, 主步步高升",
+          normalize: (x) => {
+            const s = Array.isArray(x) ? x[0] : x;
+            return typeof s === "string" && s.trim() ? s.trim() : null;
+          },
+        },
+      };
+      async function loadDailyText() {
+        await Promise.all(
+          Object.values(DAILY_TEXT).map(async (src) => {
+            try {
+              const res = await fetch(src.file);
+              if (!res.ok) throw new Error(`HTTP ${res.status}`);
+              const raw = await res.json();
+              const items = (Array.isArray(raw) ? raw : []).map(src.normalize).filter(Boolean);
+              if (!items.length) throw new Error("文件为空或格式不符");
+              src.items = items;
+            } catch (error) {
+              console.warn(`[Calendar] 加载 ${src.file} 失败，改用内置兜底文案（本地打开时请通过 http 服务访问）：`, error);
+            }
+          }),
+        );
+      }
+      const cycledPick = (src, serial) => {
+        const list = src.items.length ? src.items : [src.fallback];
+        return list[((serial % list.length) + list.length) % list.length];
+      };
+      const dailyText = (serial) => ({
+        couplet: cycledPick(DAILY_TEXT.couplet, serial),
+        dream: cycledPick(DAILY_TEXT.dream, serial),
+      });
+
+
+      // —— 节气 / 节日对联：当天是节气或节日时，用公历年份末位 0–9 作为 holidays.json 下标 ——
+      // holidays.json 结构：{ "节日或节气名": [[上联, 下联], ...] }
+      const HOLIDAY_COUPLETS = { file: "holidays.json", map: Object.create(null) };
+      async function loadHolidayCouplets() {
+        try {
+          const res = await fetch(HOLIDAY_COUPLETS.file);
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const raw = await res.json();
+          const map = Object.create(null);
+          Object.entries(raw && typeof raw === "object" ? raw : {}).forEach(([name, list]) => {
+            const items = (Array.isArray(list) ? list : [])
+              .map((x) => (Array.isArray(x) && x.length >= 2 ? [String(x[0]).trim(), String(x[1]).trim()] : null))
+              .filter(Boolean);
+            const key = String(name).trim();
+            if (key && items.length) map[key] = items;
+          });
+          if (!Object.keys(map).length) throw new Error("文件为空或格式不符");
+          HOLIDAY_COUPLETS.map = map;
+        } catch (error) {
+          console.warn(`[Calendar] 加载 ${HOLIDAY_COUPLETS.file} 失败，节日/节气日改用通用对联（本地打开时请通过 http 服务访问）：`, error);
+        }
+      }
+      // 节日名称与 holidays.json 的键保持一致；一天多个节日时用“·”连接（如 5月12日）。
+      const SOLAR_FESTIVALS = {
+        "01-01": ["元旦"],
+        "01-10": ["中国人民警察节"],
+        "02-14": ["情人节"],
+        "03-08": ["国际妇女节"],
+        "03-12": ["植树节"],
+        "03-15": ["国际消费者权益日"],
+        "05-01": ["国际劳动节"],
+        "05-04": ["五四青年节"],
+        "05-12": ["全国防灾减灾日", "国际护士节"],
+        "06-01": ["国际儿童节"],
+        "07-01": ["建党纪念日", "香港回归纪念日"],
+        "08-01": ["中国人民解放军建军节"],
+        "08-19": ["中国医师节"],
+        "09-03": ["抗战胜利纪念日"],
+        "09-10": ["教师节"],
+        "10-01": ["国庆节"],
+        "11-09": ["全国消防日"],
+        "12-04": ["国家宪法日"],
+        "12-13": ["国家公祭日"],
+        "12-20": ["澳门回归纪念日"],
+        "12-25": ["圣诞节"],
+      };
+      // 农历节日（仅普通月份，闰月不重复过节）
+      const LUNAR_FESTIVALS = {
+        "1-1": ["春节"],
+        "1-15": ["元宵节"],
+        "2-2": ["龙抬头"],
+        "5-5": ["端午节"],
+        "7-7": ["七夕节"],
+        "7-15": ["中元节"],
+        "8-15": ["中秋节"],
+        "9-9": ["重阳节"],
+        "12-8": ["腊八节"],
+        "12-23": ["小年"],
+      };
+      // 返回当天的节日名列表（顺序即拼接顺序，须与 holidays.json 的键一致）
+      function festivalNamesOf(sol, lun) {
+        const names = [];
+        const solarList = SOLAR_FESTIVALS[pad(sol.getMonth()) + "-" + pad(sol.getDay())];
+        if (solarList) names.push(...solarList);
+        // 母亲节：5月第2个星期日；父亲节：6月第3个星期日
+        if (sol.getMonth() === 5 && sol.getWeek() === 0 && sol.getDay() >= 8 && sol.getDay() <= 14) names.push("母亲节");
+        if (sol.getMonth() === 6 && sol.getWeek() === 0 && sol.getDay() >= 15 && sol.getDay() <= 21) names.push("父亲节");
+        const lunarList = LUNAR_FESTIVALS[lun.getMonth() + "-" + lun.getDay()];
+        if (lunarList) names.push(...lunarList);
+        // 除夕：农历正月初一的前一天（兼容腊月大小月与闰腊月）
+        const nextLun = sol.next(1).getLunar();
+        if (nextLun.getMonth() === 1 && nextLun.getDay() === 1) names.push("除夕");
+        return names;
+      }
+      // 当天是节气或节日时，用公历年份末位取 holidays.json 中对应一条；都不是时返回 null，沿用通用对联
+      function holidayCoupletOf(sol, lun, termName) {
+        const map = HOLIDAY_COUPLETS.map;
+        const names = festivalNamesOf(sol, lun);
+        const candidates = [];
+        if (names.length) candidates.push(names.join("·"), ...names);
+        const term = termName ? String(termName).trim() : "";
+        if (term && candidates.indexOf(term) === -1) candidates.push(term);
+        const index = ((sol.getYear() % 10) + 10) % 10;
+        for (const key of candidates) {
+          const list = map[key];
+          if (list && list.length) return list[index % list.length];
+        }
+        return null;
+      }
+
+
+      const BRANCHES = ['子', '丑', '寅', '卯', '辰', '巳', '午', '未', '申', '酉', '戌', '亥'];
+      const ZODIACS = ['鼠', '牛', '虎', '兔', '龙', '蛇', '马', '羊', '猴', '鸡', '狗', '猪'];
+
+      // 日支三合局 → 吉数生肖索引
+      const SAN_HE = {
+        0: [4, 8],   // 子 → 龙、猴
+        1: [5, 9],   // 丑 → 蛇、鸡
+        2: [6, 10],  // 寅 → 马、狗
+        3: [7, 11],  // 卯 → 羊、猪
+        4: [8, 0],   // 辰 → 猴、鼠
+        5: [9, 1],   // 巳 → 鸡、牛
+        6: [10, 2],  // 午 → 狗、虎
+        7: [11, 3],  // 未 → 猪、兔
+        8: [0, 4],   // 申 → 鼠、龙
+        9: [1, 5],   // 酉 → 牛、蛇
+        10: [2, 6],  // 戌 → 虎、马
+        11: [3, 7]   // 亥 → 兔、羊
+      };
+
+
+
+
+      // 计算某生肖在某年太岁下的 49 数专属池
+      function getZodiacPool(zodiacIdx, yearBranchIdx) {
+        const base = (((yearBranchIdx - zodiacIdx) % 12) + 12) % 12 + 1;
+        const nums = [];
+        for (let n = base; n <= 49; n += 12) {
+          nums.push(pad(n));
+        }
+        return nums;
+      }
+
+      /**
+       * 最小间距选号：后一个数与前一个数相差 < minDiff 则跳过，除非是最后一个数
+       */
+      function selectWithMinGap(sortedPool, count = 6, minDiff = 5) {
+        const selected = [];
+        const nums = sortedPool.map(Number);
+
+        for (let i = 0; i < nums.length; i++) {
+          const current = nums[i];
+          const isLast = (i === nums.length - 1);
+
+          if (selected.length === 0) {
+            selected.push(current);
+          } else {
+            const gap = current - selected[selected.length - 1];
+            if (gap >= minDiff || isLast) {
+              selected.push(current);
+            }
+          }
+          if (selected.length >= count) break;
+        }
+
+        // 不足时从后往前补齐
+        if (selected.length < count) {
+          for (let i = nums.length - 1; i >= 0 && selected.length < count; i--) {
+            if (!selected.includes(nums[i])) {
+              selected.push(nums[i]);
+            }
+          }
+          selected.sort((a, b) => a - b);
+        }
+        return selected.map(pad);
+      }
+
+      // 以立春为年界：日支三合生肖 → 49 数号码池 → 最小间距选出 6 个吉数。
+      function calculateLuckyNumbers(lun) {
+        const branchIdx = BRANCHES.indexOf(lun.getDayZhi());
+        const yearBranchIdx = BRANCHES.indexOf(lun.getYearZhiByLiChun());
+        const zodiacIndices = SAN_HE[branchIdx];
+        const fullPool = zodiacIndices
+          .flatMap(idx => getZodiacPool(idx, yearBranchIdx))
+          .sort((a, b) => Number(a) - Number(b));
+        return {
+          zodiacs: zodiacIndices.map(idx => ZODIACS[idx]).join(""),
+          numbers: selectWithMinGap(fullPool, 6, 5),
+        };
+      }
+
+      const almanacCache = new Map();
+      function almanac(dateStr) {
+        if (!HAS_LUNAR) return null;
+        const hit = almanacCache.get(dateStr);
+        if (hit) return hit;
+        const { Solar, SolarUtil, LunarMonth, LunarUtil } = window;
+        const a = dateStr.split("-");
+        const sol = Solar.fromYmd(+a[0], +a[1], +a[2]);
+        const lun = sol.getLunar();
+        console.log(sol);
+        
+        const mm = LunarMonth.fromYm(lun.getYear(), lun.getMonth());
+        // 当天仍显示当前节气；其余日期取下一个节气，按公历日期计算天数差。
+        const todayJq = lun.getCurrentJieQi();
+        const nt = todayJq || lun.getNextJieQi(true),
+          ns = nt.getSolar(),
+          nl = ns.getLunar();
+        const termDaysAway = ns.subtract(sol);
+        const termPrefix = ["今日", "明日", "后日"][termDaysAway] || nl.getDayInChinese();
+        // 三伏 / 数九按当前日历页日期计算，天数使用中文数字（含十一至二十）。
+        const seasonalPeriod = lun.getFu() || lun.getShuJiu();
+        let seasonalLabel = "";
+        if (seasonalPeriod) {
+          const index = seasonalPeriod.getIndex();
+          const indexCN = index < 10 ? LunarUtil.NUMBER[index]
+            : index === 10 ? "十"
+              : index < 20 ? "十" + LunarUtil.NUMBER[index - 10]
+                : "二十";
+          seasonalLabel = `${seasonalPeriod.getName()}第${indexCN}天`;
+        }
+        const lucky = calculateLuckyNumbers(lun);
+        const eight = lun.getEightChar();
+        eight.setSect(2);
+        const nayinName = lun.getDayNaYin();
+        const solarDays = SolarUtil.getDaysOfMonth(sol.getYear(), sol.getMonth());
+
+
+        const ci = LunarUtil.getJiaZiIndex(lun.getDayChongGan() + lun.getDayChong());
+        const ly = lun.getYear();
+        const birthA = ly - ((((ly - 4 - ci) % 60) + 60) % 60);
+        let clashAge = null;
+        [birthA, birthA - 60]
+          .filter((b) => b >= 1901 && b <= 2099)
+          .forEach((b) => {
+            const age = ly - b + 1;
+            if (age >= 1 && (clashAge === null || age < clashAge)) clashAge = age;
+          });
+
+
+        let luckRow = "";
+        const times = lun.getTimes();
+        for (let i = 0; i < 12 && i < times.length; i++) luckRow += times[i].getTianShenLuck();
+
+
+        const tai = lun.getDayPositionTai() || "";
+        let tai1 = tai,
+          tai2 = "—",
+          mk = -1;
+        ["外", "房内"].forEach((w) => {
+          const k = tai.indexOf(w);
+          if (k > -1 && (mk < 0 || k < mk)) mk = k;
+        });
+        if (mk > -1) {
+          tai1 = tai.slice(0, mk).trim();
+          tai2 = tai.slice(mk).trim();
+        }
+
+
+        const yearSx = lun.getYearShengXiao(),
+          ai = lun.getYearZhiIndex();
+        const zodiac12 = LunarUtil.SHENGXIAO.slice(1).map((name, i) => {
+          const start = ((ai - i + 12) % 12) + 1,
+            nums = [];
+          for (let n = start; n <= 49; n += 12) nums.push(pad(n));
+          return { animal: name, nums };
+        });
+
+
+        const serial = serialOf(dateStr);
+        const daily = dailyText(serial);
+        // 当天是节气或节日时，对联按公历年份末位取 holidays.json；否则沿用通用对联。
+        const holidayCouplet = holidayCoupletOf(sol, lun, todayJq ? todayJq.getName() : "");
+        const greg = utcDate(sol.getYear(), sol.getMonth(), sol.getDay());
+
+        const dayGanzhi = lun.getDayInGanZhi();
+        const jiaziIndex = window.LunarUtil.JIA_ZI.indexOf(dayGanzhi);
+        const gates = ['正北', '西南', '正东', '东南', '西北', '正西', '东北', '正南'];
+        const luckyGate = gates[Math.floor(jiaziIndex / 3) % 8];
+
+        const result = {
+          date: dateStr,
+          serial,
+          y: sol.getYear(),
+          m: sol.getMonth(),
+          day: sol.getDay(),
+          monEn: EN_MONTH.format(greg).toUpperCase(),
+          monCnNum: LunarUtil.NUMBER[sol.getMonth()],
+          wkEn: EN_WEEKDAY.format(greg).toUpperCase(),
+          wkCn: "星期" + sol.getWeekInChinese(),
+          isWeekend: sol.getWeek() === 0 || sol.getWeek() === 6,
+          gzYear: lun.getYearInGanZhi(),
+          monCN: lun.getMonthInChinese(),
+          solarSizeCN: solarDays === 31 ? "大" : solarDays === 30 ? "小" : "平",
+          sizeCN: mm && mm.getDayCount() === 30 ? "大" : "小",
+          dayCN: lun.getDayInChinese(),
+          lunarDay: lun.getDay(),
+          seasonalLabel,
+          termLabel: termPrefix + nt.getName(),
+          termName: nt.getName(),
+          termDayCN: nl.getDayInChinese(),
+          termM: ns.getMonth(),
+          termD: ns.getDay(),
+
+          yi: lun.getDayYi(1).filter((x) => x.length <= 2).slice(0, 6),
+          ji: lun.getDayJi(1).filter((x) => x.length <= 2).slice(0, 4),
+          yearSx,
+          monthSx: lun.getMonthShengXiao(),
+          daySx: lun.getDayShengXiao(),
+          clashSx: lun.getDayChongShengXiao(),
+          clashAge,
+          dayGan: lun.getDayGan(),
+          dayZhi: lun.getDayZhi(),
+          ganEl: LunarUtil.WU_XING_GAN[lun.getDayGan()],
+          zhiEl: LunarUtil.WU_XING_ZHI[lun.getDayZhi()],
+          nayinEl: nayinName.charAt(nayinName.length - 1),
+          xiu: lun.getXiu(),
+          zhiXing: lun.getZhiXing(),
+          bazi: [eight.getYear(), eight.getMonth(), eight.getDay(), eight.getTime()],
+          gods: [
+            { name: "喜神", dir: lun.getDayPositionXiDesc() },
+            { name: "财神", dir: lun.getDayPositionCaiDesc() },
+            { name: "贵神", dir: lun.getDayPositionYangGuiDesc() },
+            { name: "吉门", dir: luckyGate },
+          ],
+          numColor: lun.getDayNineStar().getNumber() + lun.getDayNineStar().getColor(),
+          feixing: yearFeixing(lun),
+          luckRow,
+          tai1,
+          tai2,
+          tide: TIDE[lun.getDay()] || ["06:00", "12:00"],
+          zodiac12,
+          luckyZodiacs: lucky.zodiacs,
+          luckyNumbers: lucky.numbers,
+          couplet: holidayCouplet || daily.couplet,
+          dream: daily.dream,
+        };
+        if (almanacCache.size > 120) almanacCache.clear();
+        almanacCache.set(dateStr, result);
+        return result;
+      }
+
+
+      function yearFeixing(lun) {
+        const center = lun.getYearNineStar().getIndex(); // 0 = 一白 … 8 = 九紫
+        const dist = {};
+        FEIXING.FLY_ORDER.forEach((palace, step) => {
+          dist[palace] = window.NineStar.fromIndex((center + step) % 9);
+        });
+        return dist;
+      }
+
+      function renderFeixing(svg, dist, color = COLORS.normal.primary) {
+        const { R_OUTER, R_INNER, R_TAIJI, STROKE, FONT_SIZE } = FEIXING;
+        const paper = CONFIG.APPEARANCE.PAPER_COLOR;
+        const cosHalf = Math.cos(Math.PI / 8);
+        const yInner = ((R_TAIJI + R_INNER * cosHalf) / 2).toFixed(1);
+        const yOuter = ((R_INNER * cosHalf + R_OUTER * cosHalf) / 2).toFixed(1);
+        const octagon = (r) => {
+          const pts = [];
+          for (let i = 0; i < 8; i++) {
+            const a = ((22.5 + i * 45) * Math.PI) / 180;
+            pts.push(`${(Math.sin(a) * r).toFixed(2)},${(-Math.cos(a) * r).toFixed(2)}`);
+          }
+          return pts.join(" ");
+        };
+        let out = `<polygon points="${octagon(R_OUTER)}" fill="${paper}" stroke="${color}" stroke-width="${STROKE.outer}" stroke-linejoin="round"/>`;
+        out += `<polygon points="${octagon(R_INNER)}" fill="none" stroke="${color}" stroke-width="${STROKE.inner}"/>`;
+        for (let i = 0; i < 8; i++) {
+          const a = ((22.5 + i * 45) * Math.PI) / 180;
+          out += `<line x1="${(Math.sin(a) * R_TAIJI).toFixed(2)}" y1="${(-Math.cos(a) * R_TAIJI).toFixed(2)}" x2="${(Math.sin(a) * R_OUTER).toFixed(2)}" y2="${(-Math.cos(a) * R_OUTER).toFixed(2)}" stroke="${color}" stroke-width="${STROKE.spoke}"/>`;
+        }
+
+        out += `<circle cx="0" cy="0" r="${R_TAIJI}" fill="${paper}" stroke="${color}" stroke-width="${STROKE.inner}"/>`;
+        out += `<path d="M 0,-${R_TAIJI} A ${R_TAIJI},${R_TAIJI} 0 0,0 0,${R_TAIJI} A ${R_TAIJI / 2},${R_TAIJI / 2} 0 0,0 0,0 A ${R_TAIJI / 2},${R_TAIJI / 2} 0 0,1 0,-${R_TAIJI} Z" fill="${color}" stroke="none"/>`;
+        out += `<circle cx="0" cy="${-R_TAIJI / 2}" r="${R_TAIJI / 8}" fill="${color}" stroke="none"/>`;
+        out += `<circle cx="0" cy="${R_TAIJI / 2}" r="${R_TAIJI / 8}" fill="${paper}" stroke="none"/>`;
+        const text = (x, y, str) =>
+          `<text x="${x}" y="${y}" fill="${color}" stroke="none"  font-size="${FONT_SIZE}" text-anchor="middle" dominant-baseline="central">${str}</text>`;
+        const half = FONT_SIZE / 2;
+        FEIXING.RING.forEach((palace, i) => {
+          const star = dist[palace];
+          out += `<g transform="rotate(${i * 45 - 180})">`;
+          out += text(0, yInner, palace);
+          out += text(-half, yOuter, star.getNumber());
+          out += text(half, yOuter, star.getColor());
+          out += `</g>`;
+        });
+        svg.setAttribute("viewBox", FEIXING.VIEWBOX);
+        svg.innerHTML = out;
+      }
+
+
+      const COLORS = {
+        normal: { primary: "#1B5E20", light: "rgba(27, 94, 32, 0.4)", tint: "rgba(27, 94, 32, 0.1)", muted: "#4d7c50" },
+        weekend: { primary: "#C62828", light: "rgba(198, 40, 40, 0.4)", tint: "rgba(198, 40, 40, 0.1)", muted: "#a95a5a" },
+      };
+      const themePalette = (isWeekend) => (isWeekend ? COLORS.weekend : COLORS.normal);
+
+      function applyChromeTheme(isWeekend) {
+        const p = themePalette(isWeekend);
+        docStyle.setProperty("--color-primary", p.primary);
+        docStyle.setProperty("--color-primary-light", p.light);
+        docStyle.setProperty("--color-primary-tint", p.tint);
+        docStyle.setProperty("--dock-muted", p.muted);
+      }
+
+      function applyThemeForIndex(index) {
+        const d = almanac(dateOf(clamp(index, MIN_INDEX, MAX_INDEX)));
+        applyChromeTheme(!!(d && d.isWeekend));
+      }
+
+
+      const INK_CAL = {
+
+        lunar: [-0.20, 1.80], weekday: [0.12, 1.80], suitable: [0.06, 0.19], avoid: [0.26, -0.25],
+        gods: [0, -0.50], bazi: [0.12, -0.31], fetus: [0.06, -0.31], lucky: [0.06, 1.50],
+      };
+      let inkCtx = null;
+      const inkCache = new Map();
+      function inkShift(el, text, name) {
+        if (!el || !text) return [0, 0];
+        const cs = getComputedStyle(el);
+        const fs = parseFloat(cs.fontSize) || 0;
+        if (!fs) return [0, 0];
+        const key = `${cs.fontFamily}|${cs.fontWeight}|${cs.fontSize}|${cs.letterSpacing}|${cs.writingMode}|${cs.paddingLeft},${cs.paddingRight},${cs.paddingTop},${cs.paddingBottom}|${text}`;
+        if (inkCache.has(key)) return inkCache.get(key);
+        if (!inkCtx) inkCtx = document.createElement("canvas").getContext("2d");
+
+        const probePx = 1000;
+        const k = fs / probePx;
+        inkCtx.font = `${cs.fontStyle} ${cs.fontWeight} ${probePx}px ${cs.fontFamily}`;
+        const m = inkCtx.measureText(text);
+        let dx = 0, dy = 0;
+        if (m.width > 0) {
+
+          const spacing = cs.letterSpacing === "normal" ? 0 : parseFloat(cs.letterSpacing) || 0;
+          const adv = m.width * k;
+          const lB = -m.actualBoundingBoxLeft * k;           // 左侧墨迹内缩
+          const rB = adv - m.actualBoundingBoxRight * k;     // 右侧墨迹内缩
+          const inlineOff = (lB - rB - spacing) / 2;
+          const vertical = /^vertical/.test(cs.writingMode);
+          if (vertical) {
+            const padT = parseFloat(cs.paddingTop) || 0, padB = parseFloat(cs.paddingBottom) || 0;
+            dy = -((padT - padB) / 2 + inlineOff);
+          } else {
+            const padL = parseFloat(cs.paddingLeft) || 0, padR = parseFloat(cs.paddingRight) || 0;
+            dx = -((padL - padR) / 2 + inlineOff);
+          }
+        }
+        const cal = INK_CAL[name] || [0, 0];
+        const out = [dx + cal[0], dy + cal[1]];
+        inkCache.set(key, out);
+        return out;
+      }
+
+      function applyInkCenter(card, chipId, probe, text, name) {
+        const chip = cardEl(card, chipId);
+        const span = chip && chip.querySelector(".ink");
+        if (!span) return;
+        const [dx, dy] = inkShift(probe || chip, text, name);
+        const parts = [];
+        if (Math.abs(dx) > 0.03) parts.push(`translateX(${dx.toFixed(2)}px)`);
+        if (Math.abs(dy) > 0.03) parts.push(`translateY(${dy.toFixed(2)}px)`);
+        span.style.transform = parts.join(" ");
+      }
+
+      const STATIC_INK_CHIPS = [
+        ["gods", ".grid-auspicious-gods .header"],
+        ["bazi", ".grid-bazi .bazi-header"],
+        ["fetus", ".grid-fetus-spirit .bazi-header"],
+        ["lucky", ".grid-lucky-numbers .header"],
+        ["suitable", ".grid-suitable .oval-icon"],
+        ["avoid", ".grid-avoid .oval-icon"],
+      ];
+      function applyStaticInkCenters(card) {
+        if (!card) return;
+        for (const [name, sel] of STATIC_INK_CHIPS) {
+          const chip = card.querySelector(sel);
+          const span = chip && chip.querySelector(".ink");
+          if (!span) continue;
+          const [dx, dy] = inkShift(chip, span.textContent.trim(), name);
+          const parts = [];
+          if (Math.abs(dx) > 0.03) parts.push(`translateX(${dx.toFixed(2)}px)`);
+          if (Math.abs(dy) > 0.03) parts.push(`translateY(${dy.toFixed(2)}px)`);
+          span.style.transform = parts.join(" ");
+        }
+      }
+
+      function setChipText(card, chipId, value, name) {
+        const chip = cardEl(card, chipId);
+        if (!chip) return;
+        const span = chip.querySelector(".ink");
+        (span || chip).textContent = value;
+        if (span) applyInkCenter(card, chipId, cardEl(tpl, chipId), value, name);
+      }
+
+      function refSel(id) {
+        return `[data-ref="${id}"]`;
+      }
+      function cardEl(root, id) {
+        if (root) return root.querySelector(refSel(id)) || root.querySelector("#" + id);
+        return $(id);
+      }
+      const cardRoot = (root) => root || $("tpl");
+
+      function refifyIds(root) {
+        root.querySelectorAll("[id]").forEach((el) => {
+          el.setAttribute("data-ref", el.id);
+          el.removeAttribute("id");
+        });
+        return root;
+      }
+
+
+      function buildPrintAliasCSS() {
+        const ids = new Set(Array.from(tpl.querySelectorAll("[id]")).map((el) => el.id));
+        if (!ids.size) return "";
+        const out = new Set();
+        const visit = (rules, inPrintMedia) => {
+          for (const rule of rules || []) {
+            const type = rule.constructor.name;
+            if (type === "CSSPageRule" || type === "CSSKeyframesRule" || type === "CSSFontFaceRule" || type === "CSSPropertyRule") continue;
+            if (type === "CSSMediaRule" || type === "CSSSupportsRule") {
+
+              if (type === "CSSSupportsRule" || /print|all/i.test(rule.conditionText || "")) visit(rule.cssRules, true);
+              continue;
+            }
+            if (!rule.selectorText || !rule.style) continue;
+            if (!rule.selectorText.includes("#")) continue;
+            let hit = false;
+            const selector = rule.selectorText.replace(/#([A-Za-z_][\w-]*)/g, (m, id) => {
+              if (!ids.has(id)) return m;
+              hit = true;
+              return `[data-ref="${id}"]`;
+            });
+            if (hit) out.add(`#print-root ${selector} { ${rule.style.cssText} }`);
+          }
+        };
+        for (const sheet of document.styleSheets) {
+          if (!sheet.ownerNode || sheet.ownerNode.id === "print-alias") continue;
+          try {
+            visit(sheet.cssRules, false);
+          } catch (error) {
+
+          }
+        }
+        if (!out.size) return "";
+        return `@media print {\n${Array.from(out).join("\n")}\n}`;
+      }
+
+      function syncPrintAliases() {
+        const host = $("print-alias");
+        if (!host) return;
+        const css = buildPrintAliasCSS();
+        if (css && host.textContent !== css) host.textContent = css;
+      }
+
+      function cornerMarkup(transform, c) {
+        return (
+          `<g transform="${transform}" fill="none" stroke="${c}">` +
+          `<path d="M 4 28 L 4 6 C 4 4.9 4.9 4 6 4 L 28 4" fill="none" stroke="${c}" stroke-width="2.2" stroke-linecap="round"/>` +
+          `<path d="M 6 12 C 10 12 12 9 12 6 M 12 6 C 12 12 15 15 21 15 C 25 15 27 12 25 9 C 23 6 18 8 18 12 C 18 18 10 20 7 24 M 16 6 C 18 10 22 10 24 6 M 6 18 C 11 18 13 22 11 26 C 9 29 6 27 6 24 M 15 15 C 15 21 12 25 9 25 C 6 25 6 21 10 20" fill="none" stroke="${c}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>` +
+          `<circle cx="9" cy="9" r="1.5" fill="${c}" stroke="none"/>` +
+          `</g>`
+        );
+      }
+
+      const cornerColors = new WeakMap();
+      function buildCorners(root, color) {
+        const host = cardEl(cardRoot(root), "t-corners");
+        if (!host) return;
+        const c = color || COLORS.normal.primary;
+        if (cornerColors.get(host) === c && host.childNodes.length) return;
+        cornerColors.set(host, c);
+        host.innerHTML =
+          cornerMarkup("translate(2, 10)", c) +
+          cornerMarkup("translate(2, 86) scale(1, -1)", c) +
+          cornerMarkup("translate(958, 10) scale(-1, 1)", c) +
+          cornerMarkup("translate(958, 86) scale(-1, -1)", c);
+      }
+      const headerColors = new WeakMap();
+      function applyHeaderColor(root, color) {
+        const card = cardRoot(root);
+        if (!card) return;
+        if (headerColors.get(card) === color) return;
+        headerColors.set(card, color);
+        const g = cardEl(card, "t-header-graphics");
+        if (g) {
+          g.setAttribute("stroke", color);
+          g.querySelectorAll(":scope > path").forEach((p) => p.setAttribute("stroke", color));
+        }
+        for (const id of ["t-en", "t-year", "t-cn"]) {
+          const el = cardEl(card, id);
+          if (el) {
+            el.setAttribute("fill", color);
+            el.setAttribute("stroke", "none");
+          }
+        }
+        buildCorners(card, color);
+      }
+      buildCorners();
+
+
+      const tpl = $("tpl");
+
+      function applyCalendarTheme(root, isWeekend) {
+        const card = cardRoot(root);
+        const palette = themePalette(isWeekend);
+
+        card.style.setProperty("--color-primary", palette.primary);
+        card.style.setProperty("--color-primary-light", palette.light);
+        card.style.setProperty("--color-primary-tint", palette.tint);
+        card.classList.toggle("weekend", !!isWeekend);
+        applyHeaderColor(card, palette.primary);
+      }
+
+      function fillItems(root, hostId, cls, list, max) {
+        const host = cardEl(root, hostId);
+        if (!host) return;
+        for (let i = 0; i < max; i++) {
+          const slot = host.querySelector(`.${cls}-${i}`);
+          if (slot) slot.textContent = (list && list[i]) || "";
+        }
+      }
+
+
+      function fillZodiac(root, hostId, item) {
+        const host = cardEl(root, hostId);
+        if (!host) return;
+        const nums = item.nums.slice(0, 4);
+        while (nums.length < 4) nums.push("--");
+        for (let i = 0; i < 4; i++) {
+          const slot = host.querySelector(`.n-${i}`);
+          if (slot) slot.textContent = nums[i];
+        }
+        const icon = host.querySelector(".animal-icon");
+        if (icon) icon.textContent = item.animal;
+      }
+
+      function fillCard(root, d) {
+        if (!d) return;
+        const card = cardRoot(root);
+        const $q = (id) => cardEl(card, id);
+        applyCalendarTheme(card, d.isWeekend);
+        const en = $q("t-en"),
+          name = d.monEn;
+        en.textContent = name;
+        en.setAttribute("font-size", name.length > 8 ? "52" : "60");
+        en.setAttribute("x", name.length > 8 ? "190" : "200");
+        $q("t-year").textContent = d.y;
+        $q("t-cn").textContent = d.monCnNum + "月" + d.solarSizeCN;
+        $q("t-cpl-l").textContent = d.couplet[0];
+        $q("t-cpl-r").textContent = d.couplet[1];
+        $q("t-day").textContent = d.day;
+        $q("t-lun-top").textContent = `农历${d.gzYear}年${d.monCN}月${d.sizeCN}`;
+        setChipText(card, "t-lun-bot", `${d.dayCN}日`, "lunar");
+        // top 始终显示节气；bot 在三伏 / 数九期间显示提醒，并由 CSS 排到上方。
+        const termTop = $q("t-term-top");
+        termTop.textContent = d.termLabel;
+        $q("t-term-bot").textContent = d.seasonalLabel || `${d.termM}月${d.termD}日`;
+        termTop.parentElement.classList.toggle("is-seasonal", !!d.seasonalLabel);
+        $q("t-wk-en").textContent = d.wkEn;
+        setChipText(card, "t-wk-cn", d.wkCn, "weekday");
+        fillItems(card, "t-yi", "yi", d.yi, 6);
+        fillItems(card, "t-ji", "ji", d.ji, 4);
+        $q("t-luck-row").textContent = d.luckRow;
+        $q("t-nine").textContent = `九星${d.numColor}`;
+        $q("t-cf-day").textContent = d.daySx;
+        $q("t-cf-clash").textContent = d.clashSx;
+        $q("t-cf-text").textContent = `${d.daySx}日冲${d.clashSx}${d.clashAge ? " 生年" + d.clashAge + "岁" : ""}`;
+        $q("t-ym").textContent = `${d.yearSx}年${d.monthSx}月`;
+        const godDirs = { 喜神: "t-god-xi", 财神: "t-god-cai", 贵神: "t-god-yang", 吉门: "t-god-gate" };
+        d.gods.forEach((g) => {
+          const el = godDirs[g.name] && $q(godDirs[g.name]);
+          if (el) el.textContent = g.dir;
+        });
+        const themeColor = d.isWeekend ? COLORS.weekend.primary : COLORS.normal.primary;
+        renderFeixing($q("t-feixing"), d.feixing, themeColor);
+        $q("t-gan").textContent = d.dayGan;
+        $q("t-gan-el").textContent = "属" + d.ganEl;
+        $q("t-zhi").textContent = d.dayZhi;
+        $q("t-zhi-el").textContent = "属" + d.zhiEl;
+        $q("t-nayin").textContent = d.nayinEl;
+        $q("t-nayin-el").textContent = "属" + d.nayinEl;
+        $q("t-xiu").textContent = d.xiu;
+        $q("t-zx").textContent = d.zhiXing;
+        const bz = $q("t-bazi").children;
+        for (let i = 0; i < 4 && i < bz.length; i++) bz[i].textContent = d.bazi[i];
+        const tk = $q("t-tai").children;
+        if (tk[0]) tk[0].textContent = d.tai1;
+        if (tk[1]) tk[1].textContent = d.tai2;
+
+        const page = (d.serial % 3) * 4;
+        ["t-z1", "t-z2", "t-z3", "t-z4"].forEach((id, i) => {
+          const item = d.zodiac12[page + i];
+          if (!item) return;
+          fillZodiac(card, id, item);
+        });
+        $q("t-lucky-zx").textContent = d.luckyZodiacs;
+        $q("t-lucky-num").textContent = d.luckyNumbers.join(" ");
+        const dream = $q("t-dream");
+        dream.textContent = d.dream;
+
+        const dreamRatio = d.dream.length / 15;
+        dream.style.fontSize = dreamRatio > 1 ? `calc(${(6 / dreamRatio).toFixed(2)} * var(--u))` : "";
+        $q("t-tide-rise").textContent = `涨潮 ${d.tide[0]} 分`;
+        $q("t-tide-fall").textContent = `落潮 ${d.tide[1]} 分`;
+      }
+
+      function buildDayCard(d) {
+        const card = tpl.cloneNode(true);
+        $("tex-host").appendChild(card);
+        fillCard(card, d);
+        card._artReady = prepareCalendarArt(card, d);
+        return card;
+      }
+      async function prepareCalendarArt(card, d) {
+        try { return await window.CalendarArt?.apply(card, d, themePalette(!!d?.isWeekend).primary); }
+        catch (error) { console.warn("[Calendar Art] 保留日期数字：", error); return null; }
+      }
+
+
+      const grain = (() => {
+        const c = document.createElement("canvas");
+        c.width = c.height = 96;
+        const g = c.getContext("2d", { willReadFrequently: true });
+        g.fillStyle = "#fdfcf7";
+        g.fillRect(0, 0, 96, 96);
+        const im = g.getImageData(0, 0, 96, 96);
+        for (let i = 0; i < im.data.length; i += 4) {
+          const amt = Math.round(noise(i) * 5);
+          im.data[i] -= amt;
+          im.data[i + 1] -= amt;
+          im.data[i + 2] -= amt;
+        }
+        g.putImageData(im, 0, 0);
+        return c;
+      })();
+
+      let iconFontCSS = "";
+      let iconFontBase64Promise = null;
+
+      async function loadIconFonts() {
+        return (document.fonts && document.fonts.load)
+          ? Promise.all(ICON_FONTS.map((font) => document.fonts.load(`16px "${font.family}"`, "鼠牛虎兔龙蛇马羊猴鸡狗猪").catch(() => null)))
+          : Promise.resolve();
+      }
+
+      function prepareEmbeddedFontCSS() {
+        if (iconFontBase64Promise) return iconFontBase64Promise;
+        iconFontBase64Promise = Promise.all(
+          ICON_FONTS.map(async (font) => {
+            try {
+              const res = await fetch(font.file);
+              if (!res.ok) throw new Error(`HTTP ${res.status}`);
+              const dataUrl = await new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = () => reject(reader.error);
+                res.blob().then(reader.readAsDataURL.bind(reader), reject);
+              });
+              return `@font-face{font-family:"${font.family}";src:url(${dataUrl}) format("truetype");font-weight:normal;font-style:normal;}`;
+            } catch (error) {
+              console.warn(`[Calendar] 图标字体 ${font.file} 加载失败：`, error);
+              return "";
+            }
+          })
+        ).then(faces => {
+          iconFontCSS = faces.join("");
+          cssCache = "";
+        });
+        return iconFontBase64Promise;
+      }
+
+      let cssCache = "";
+      function collectCSS() {
+        if (cssCache) return cssCache;
+        let css = "";
+        for (const sheet of document.styleSheets) {
+          try {
+            for (const r of sheet.cssRules || []) {
+              if (r.type === CSSRule.FONT_FACE_RULE) continue;
+              css += r.cssText + "\n";
+            }
+          } catch (e) { }
+        }
+        cssCache = iconFontCSS + css;
+        return cssCache;
+      }
+
+
+      function normalizeTexture(source) {
+        if (source.width === TEX.width && source.height === TEX.height) return source;
+        const output = document.createElement("canvas");
+        output.width = TEX.width;
+        output.height = TEX.height;
+        const ctx = output.getContext("2d");
+        ctx.fillStyle = "#fdfcf7";
+        ctx.fillRect(0, 0, TEX.width, TEX.height);
+        ctx.drawImage(source, 0, 0, TEX.width, TEX.height);
+        return output;
+      }
+
+
+      const CAPTURE_LIMIT = 1;
+      let captureActive = 0;
+      const captureWaiters = [];
+      function acquireCaptureSlot() {
+        if (captureActive < CAPTURE_LIMIT) {
+          captureActive++;
+          return Promise.resolve();
+        }
+        return new Promise((resolve) => captureWaiters.push(resolve));
+      }
+      function releaseCaptureSlot() {
+        const next = captureWaiters.shift();
+        if (next) next();
+        else captureActive--;
+      }
+
+      async function captureTexture(card) {
+        await card._artReady;
+        await acquireCaptureSlot();
+        try {
+          if (window.snapdom && typeof window.snapdom.toCanvas === "function") {
+            try {
+              const c = await window.snapdom.toCanvas(card, { backgroundColor: "#fdfcf7", embedFonts: true, dpr: 1, scale: TEX_CAPTURE_SCALE });
+              if (c && c.width > 0) return normalizeTexture(c);
+            } catch (e) {
+
+            }
+          }
+          await prepareEmbeddedFontCSS();
+          return await new Promise((resolve) => {
+            const c = document.createElement("canvas");
+            c.width = TEX.width;
+            c.height = TEX.height;
+            const ctx = c.getContext("2d", { willReadFrequently: true });
+            ctx.fillStyle = ctx.createPattern(grain, "repeat");
+            ctx.fillRect(0, 0, TEX.width, TEX.height);
+            const svg =
+              `<svg xmlns="http://www.w3.org/2000/svg" width="${NATIVE_TEX.width}" height="${NATIVE_TEX.height}" viewBox="0 0 ${NATIVE_TEX.width} ${NATIVE_TEX.height}" preserveAspectRatio="none" style="background:#fdfcf7;">` +
+              `<rect width="100%" height="100%" fill="#fdfcf7"/>` +
+              `<foreignObject width="100%" height="100%"><div xmlns="http://www.w3.org/1999/xhtml" lang="${document.documentElement.lang || "zh-CN"}" style="width:${NATIVE_TEX.width}px;height:${NATIVE_TEX.height}px;background:#fdfcf7;">` +
+              `<style>${collectCSS()}</style>${new XMLSerializer().serializeToString(card)}</div></foreignObject></svg>`;
+            // XML serialization closes <img>; a data URI keeps foreignObject captures origin-clean.
+            const url = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svg)));
+            const img = new Image();
+            img.onload = () => {
+              ctx.drawImage(img, 0, 0, TEX.width, TEX.height);
+              resolve(c);
+            };
+            img.onerror = () => {
+              resolve(c);
+            };
+            img.src = url;
+          });
+        } finally {
+          releaseCaptureSlot();
+          card.remove();
+        }
+      }
+
+
+      const texStore = new Map();
+      const texPending = new Map();
+
+      const BLANK = (() => {
+        const c = document.createElement("canvas");
+        c.width = TEX.width;
+        c.height = TEX.height;
+        const x = c.getContext("2d");
+        x.fillStyle = CONFIG.APPEARANCE.PAPER_COLOR;
+        x.fillRect(0, 0, TEX.width, TEX.height);
+        return c;
+      })();
+      const BLANK_BACK = (() => {
+        const c = document.createElement("canvas");
+        c.width = TEX.width;
+        c.height = TEX.height;
+        const x = c.getContext("2d");
+        x.fillStyle = CONFIG.APPEARANCE.BACKFACE_COLOR;
+        x.fillRect(0, 0, TEX.width, TEX.height);
+        return c;
+      })();
+
+      function makeBack(front) {
+        const c = document.createElement("canvas");
+        c.width = TEX.width;
+        c.height = TEX.height;
+        const ctx = c.getContext("2d");
+        ctx.fillStyle = CONFIG.APPEARANCE.BACKFACE_COLOR;
+        ctx.fillRect(0, 0, TEX.width, TEX.height);
+        ctx.globalCompositeOperation = "multiply";
+        ctx.globalAlpha = CONFIG.APPEARANCE.BACKFACE_OPACITY;
+        ctx.drawImage(front, 0, 0);
+        return c;
+      }
+      function ensureTexture(index) {
+        if (index < MIN_INDEX || index > MAX_INDEX) return Promise.resolve(null);
+        if (texStore.has(index)) return Promise.resolve(texStore.get(index));
+        if (texPending.has(index)) return texPending.get(index);
+        const p = (async () => {
+          if (texStore.has(index)) return texStore.get(index);
+          const card = buildDayCard(almanac(dateOf(index)));
+          await card._artReady;
+          const templateId = card.dataset.templateId || "";
+          const front = await captureTexture(card);
+          const entry = { front, back: null, templateId };
+          texStore.set(index, entry);
+          renderer.invalidate(index);
+          return entry;
+        })();
+        texPending.set(index, p);
+        p.then(
+          () => texPending.delete(index),
+          () => texPending.delete(index),
+        );
+        return p;
+      }
+      function pruneTextures() {
+        for (const key of texStore.keys()) {
+          if (key === state.rollFace) continue;
+          if (key < state.index - 2 || key > state.index + 2) texStore.delete(key);
+        }
+      }
+      const pagePrint = (index) => (texStore.get(index) || {}).front || BLANK;
+      const backPrint = (index) => {
+        const entry = texStore.get(index);
+        if (!entry) return BLANK_BACK;
+        if (!entry.back) entry.back = makeBack(entry.front);
+        return entry.back;
+      };
+
+
+      const book = $("book");
+      const currentCanvas = $("current-page");
+      const nextCanvas = $("next-page");
+      const pageLoader = $("page-loader");
+      const tearCanvas = $("tear-canvas");
+      const tearContext = tearCanvas.getContext("2d");
+      const roll = $("roll");
+      const rollCanvas = $("roll-canvas");
+      const rollContext = rollCanvas.getContext("2d");
+      const bar = $("bar");
+      const datePicker = $("date-picker");
+      let dateWidget = null;
+      let exportStartWidget = null;
+      let exportEndWidget = null;
+
+      const state = {
+        index: TODAY_INDEX,
+        mode: "idle",
+        pointer: null,
+        down: null,
+        last: null,
+        grab: null,
+        velocity: { x: 0, y: 0 },
+        flip: null,
+        tear: null,
+        tween: null,
+        frame: 0,
+        lastFrame: 0,
+        sequence: [],
+        sequenceTotal: 0,
+      };
+      state.tornCount = 0;
+      // 卷轴厚度按已过日期计算；映射面只在本会话真正卷入后才有，首屏因此保持卷轴本体。
+      state.rollFace = -1;
+      const rolledCount = () => Math.max(0, state.index - MIN_INDEX - state.tornCount);
+      const lastRolled = () => state.rollFace;
+      const rebuildRoll = (index) => {
+        state.tornCount = 0;
+        state.rollFace = index > MIN_INDEX ? index - 1 : -1;
+      };
+
+      const isTearing = () => state.mode === "tear" || (state.mode === "animating" && state.tween && state.tween.kind === "tear");
+
+      let scale = 1,
+        pixelRatio = 1,
+        rollKey = "";
+      let paintVersion = 0,
+        actionVersion = 0;
+      let tearView = { left: VIEW.left, top: VIEW.top, width: VIEW.width, height: VIEW.height };
+
+      function setMode(mode) {
+        state.mode = mode;
+        book.dataset.state = mode;
+        book.setAttribute("aria-busy", String(mode !== "idle"));
+        const idle = mode === "idle";
+        const nextOk = idle && state.index < MAX_INDEX;
+        const prevOk = idle && state.index > MIN_INDEX;
+        $("btn-next").disabled = !nextOk;
+        $("btn-prev").disabled = !prevOk;
+      }
+
+      function paintRestingCanvas(canvas, pageIndex) {
+        canvas.dataset.templateId = texStore.get(pageIndex)?.templateId || "";
+        if (canvas.width !== TEX.width) canvas.width = TEX.width;
+        if (canvas.height !== TEX.height) canvas.height = TEX.height;
+        canvas.getContext("2d").drawImage(pagePrint(pageIndex), 0, 0);
+        canvas.style.clipPath = "none";
+        canvas.style.visibility = "";
+      }
+
+      function syncCurrentDay(index, d) {
+        const date = dateOf(index);
+        const label = d ? `${d.y}年${d.m}月${d.day}日 ${d.wkCn} · 农历${d.monCN}月${d.dayCN} · ${d.termDayCN}${d.termName}` : date;
+        $("announcement").textContent = label;
+        book.setAttribute("aria-label", "老黄历 " + label);
+        document.title = date + " · 老黄历 纸上光阴";
+        if (datePicker) datePicker.value = date;
+        if (dateWidget) dateWidget.setDate(date, { silent: true });
+        applyChromeTheme(!!(d && d.isWeekend));
+      }
+
+      let warmupGeneration = 0;
+      function scheduleNeighborWarmup(index) {
+        const generation = ++warmupGeneration;
+        const queue = [index + 1, index - 1, index + 2, index - 2]
+          .filter((candidate) => candidate >= MIN_INDEX && candidate <= MAX_INDEX && !texStore.has(candidate));
+        const runNext = () => {
+          if (!queue.length || generation !== warmupGeneration) return;
+          const run = () => {
+            if (generation !== warmupGeneration) return;
+            if (!["idle", "loading"].includes(state.mode)) {
+              window.setTimeout(runNext, 80);
+              return;
+            }
+            const candidate = queue.shift();
+            ensureTexture(candidate)
+              .then(() => {
+                if (generation !== warmupGeneration) return;
+                renderer.prepare(candidate);
+                if (index === state.index && candidate === index + 1) paintRestingCanvas(nextCanvas, candidate);
+                if (index === state.index && candidate === lastRolled()) {
+                  rollKey = "";
+                  drawRoll();
+                }
+                runNext();
+              })
+              .catch((error) => {
+                reportTextureError(error);
+                runNext();
+              });
+          };
+          if ("requestIdleCallback" in window) window.requestIdleCallback(run, { timeout: 500 });
+          else window.setTimeout(run, 0);
+        };
+        runNext();
+      }
+
+      function renderRestingPage(index) {
+        if (renderer.lost || !texStore.has(index)) {
+          renderer.canvas.hidden = true;
+          return;
+        }
+        renderer.render(0, {
+          grip: 0,
+          grabY: SIZE.height,
+          flipIndex: index,
+          underIndex: Math.min(MAX_INDEX, index + 1),
+        });
+      }
+
+
+      async function paintRestingPages() {
+        const index = state.index,
+          version = ++paintVersion;
+
+        await ensureTexture(index);
+        if (version !== paintVersion || index !== state.index || !["idle", "loading"].includes(state.mode)) return;
+        paintRestingCanvas(currentCanvas, index);
+        renderRestingPage(index);
+        pageLoader.hidden = true;
+        const d = almanac(dateOf(index));
+        syncCurrentDay(index, d);
+        drawRoll();
+        if (texStore.has(index + 1)) paintRestingCanvas(nextCanvas, index + 1);
+        scheduleNeighborWarmup(index);
+      }
+
+      function reportTextureError(error) {
+        console.warn("[Calendar texture]", error);
+      }
+
+
+      function drawRoll(count = rolledCount(), sourceIndex = lastRolled(), wrapAlpha = 1, baseIndex = -1) {
+        if (isTearing()) return;
+        const { radius, height: rollHeight, opacity } = rollMetrics(count);
+
+        if (state.mode === "idle" || state.mode === "loading") {
+          const rollHidden = count <= 0.001;
+          const overflowBook = rollHidden ? 0 : Math.max(0, rollHeight - CONFIG.APPEARANCE.ROLL_OFFSET);
+          docStyle.setProperty("--roll-reserve", `${(overflowBook * scale).toFixed(1)}px`);
+        }
+        bar.hidden = count > 0.001;
+        roll.style.top = "auto";
+        roll.style.bottom = `calc(100% - ${CONFIG.APPEARANCE.ROLL_OFFSET}px)`;
+        roll.style.height = `${rollHeight}px`;
+        if (count <= 0.001) {
+          roll.hidden = true;
+          roll.style.opacity = "1";
+          rollKey = "";
+          return;
+        }
+        const key = `${sourceIndex}:${baseIndex}:${radius.toFixed(3)}:${wrapAlpha.toFixed(3)}:${opacity.toFixed(3)}:${texStore.has(sourceIndex)}:${texStore.has(baseIndex)}`;
+        if (key === rollKey) return;
+        rollKey = key;
+        roll.hidden = false;
+        roll.style.opacity = opacity.toFixed(3);
+
+        const dpr = Math.max(2, window.devicePixelRatio || 2);
+        const targetWidth = Math.ceil(422 * dpr),
+          targetHeight = Math.max(4, Math.ceil(radius * 2 * dpr));
+
+        if (rollCanvas.width !== targetWidth) rollCanvas.width = targetWidth;
+        if (rollCanvas.height !== targetHeight) rollCanvas.height = targetHeight;
+
+        rollContext.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+        rollContext.imageSmoothingEnabled = true;
+        rollContext.imageSmoothingQuality = "high";
+
+        const height = rollCanvas.height / dpr;
+        rollContext.clearRect(0, 0, 422, height);
+        rollContext.fillStyle = "#f8f6ef";
+        rollContext.fillRect(0, 0, 422, height);
+        const drawStrips = (pageIndex, alpha, stripRadius = radius) => {
+          if (pageIndex < 0 || alpha <= 0.001 || !texStore.has(pageIndex)) return;
+          const source = pagePrint(pageIndex);
+          rollContext.save();
+          rollContext.globalCompositeOperation = "multiply";
+          rollContext.globalAlpha = 0.42 * alpha;
+          const strips = CONFIG.PRECISION.ROLL_STRIPS;
+          const sourceScaleY = source.height / SIZE.height;
+          for (let i = 0; i < strips; i++) {
+            const y0 = (i / strips) * height,
+              y1 = ((i + 1) / strips) * height;
+            const s0 = stripRadius * (Math.PI / 2 - Math.asin(clamp((2 * i) / strips - 1, -1, 1)));
+            const s1 = stripRadius * (Math.PI / 2 - Math.asin(clamp((2 * (i + 1)) / strips - 1, -1, 1)));
+
+            const sy = Math.floor((CONFIG.APPEARANCE.HINGE_HEIGHT + s1) * sourceScaleY);
+            const sHeight = Math.ceil(Math.max(0.1, s0 - s1) * sourceScaleY);
+
+            rollContext.save();
+            rollContext.translate(0, y1);
+            rollContext.scale(1, -1);
+
+            rollContext.drawImage(source, 0, sy, source.width, sHeight, 1, 0, SIZE.width, y1 - y0 + 0.5);
+            rollContext.restore();
+          }
+          rollContext.restore();
+        };
+        if (wrapAlpha < 0.999) {
+          if (baseIndex >= 0) drawStrips(baseIndex, 1 - wrapAlpha, radiusAt(rolledCount()));
+          drawStrips(sourceIndex, baseIndex >= 0 || rolledCount() > 0 ? wrapAlpha : 1);
+        } else {
+          drawStrips(sourceIndex, 1);
+        }
+        rollContext.globalAlpha = 1;
+        rollContext.globalCompositeOperation = "source-over";
+        const shade = rollContext.createLinearGradient(0, 0, 0, height);
+        shade.addColorStop(0, "rgba(45,42,34,.40)");
+        shade.addColorStop(0.16, "rgba(45,42,34,.08)");
+        shade.addColorStop(0.34, "rgba(255,255,255,.49)");
+        shade.addColorStop(0.55, "rgba(255,255,255,.06)");
+        shade.addColorStop(0.83, "rgba(40,37,30,.16)");
+        shade.addColorStop(1, "rgba(40,37,30,.43)");
+        rollContext.fillStyle = shade;
+        rollContext.fillRect(0, 0, 422, height);
+        const ends = rollContext.createLinearGradient(0, 0, 422, 0);
+        ends.addColorStop(0, "#38352d38");
+        ends.addColorStop(0.025, "#38352d00");
+        ends.addColorStop(0.975, "#38352d00");
+        ends.addColorStop(1, "#38352d38");
+        rollContext.fillStyle = ends;
+        rollContext.fillRect(0, 0, 422, height);
+      }
+
+
+      function departureAngle(progress) {
+        const delay = 1.82 * Math.sin(Math.PI * progress) * (1 - 0.65 * progress * progress);
+        return TAU * progress - delay;
+      }
+      function wrapAmount(progress) {
+        return clamp((departureAngle(progress) - Math.PI / 2) / (1.5 * Math.PI), 0, 1);
+      }
+      function coverRadius(progress) {
+        return rollMetrics(rolledCount() + wrapAmount(progress)).radius;
+      }
+      function syncRollWithFlip(progress) {
+        const wrap = wrapAmount(progress);
+        if (wrap <= 0.001) drawRoll(rolledCount(), lastRolled());
+        else if (rolledCount() === 0) drawRoll(wrap, state.index, wrap, -1);
+        else drawRoll(rolledCount() + wrap, state.index, wrap, lastRolled());
+      }
+      function freeAngle(t, progress, column, grip) {
+        const wave = Math.sin(Math.PI * progress) * (progress > 0.5 ? Math.max(0, 1 - (progress - 0.5) * 1.8) : 1);
+        return departureAngle(progress) + 3.64 * wave * Math.pow(t, 1.3) + 0.36 * grip * column * wave * Math.pow(t, 1.8);
+      }
+      function wrapGeometry(progress, radius) {
+        const axis = radius;
+        const drop = CONFIG.APPEARANCE.HINGE_HEIGHT - axis;
+        const wrapRadius = Math.max(drop, radius - CONFIG.APPEARANCE.SKIN);
+        const leadIn = wrapRadius - drop;
+        const angle = Math.max(0, departureAngle(progress) - Math.PI / 2);
+        return { axis, wrapRadius, leadIn, angle, wrapped: leadIn + wrapRadius * angle };
+      }
+      function columnPoints(progress, column, grip, radius, rows = CONFIG.PRECISION.MESH_ROWS) {
+        const result = new Float32Array((rows + 1) * 3);
+        const length = SIZE.height - CONFIG.APPEARANCE.HINGE_HEIGHT;
+        const step = length / rows;
+        const x = ((column + 1) * SIZE.width) / 2;
+        const { axis, wrapRadius, leadIn, angle, wrapped } = wrapGeometry(progress, radius);
+        const free = length - wrapped;
+        let row = 0;
+        for (; row <= rows; row++) {
+          const s = row * step;
+          if (s > wrapped) break;
+          const offset = row * 3;
+          result[offset] = x;
+          if (s <= leadIn) {
+            result[offset + 1] = CONFIG.APPEARANCE.HINGE_HEIGHT + s;
+            result[offset + 2] = 0;
+          } else {
+            const phi = Math.PI / 2 + (s - leadIn) / wrapRadius;
+            result[offset + 1] = axis + wrapRadius * Math.sin(phi);
+            result[offset + 2] = -wrapRadius * Math.cos(phi);
+          }
+        }
+        const phi = Math.PI / 2 + angle;
+        let y = axis + wrapRadius * Math.sin(phi);
+        let z = -wrapRadius * Math.cos(phi);
+        let previous = wrapped;
+        for (; row <= rows; row++) {
+          const s = row * step;
+          const t = ((previous + s) / 2 - wrapped) / free;
+          const direction = freeAngle(t, progress, column, grip);
+          y += (s - previous) * Math.cos(direction);
+          z += (s - previous) * Math.sin(direction);
+          previous = s;
+          const offset = row * 3;
+          result[offset] = x;
+          result[offset + 1] = y;
+          result[offset + 2] = z;
+        }
+        return result;
+      }
+      function project(x, y, z) {
+        const factor = CONFIG.APPEARANCE.PERSPECTIVE / (CONFIG.APPEARANCE.PERSPECTIVE - z);
+        return {
+          x: VIEW.left + SIZE.width / 2 + (x - SIZE.width / 2) * factor,
+          y: VIEW.top + SIZE.height + (y - SIZE.height) * factor,
+        };
+      }
+      function grabHeight(progress, flip) {
+        const column = clamp(flip.grip, -1, 1);
+        const points = columnPoints(progress, column, flip.grip, coverRadius(progress));
+        const position = clamp(
+          ((flip.grabY - CONFIG.APPEARANCE.HINGE_HEIGHT) / (SIZE.height - CONFIG.APPEARANCE.HINGE_HEIGHT)) * CONFIG.PRECISION.MESH_ROWS,
+          0,
+          CONFIG.PRECISION.MESH_ROWS
+        );
+        const row = Math.min(CONFIG.PRECISION.MESH_ROWS - 1, Math.floor(position));
+        const amount = position - row;
+        const y = lerp(points[row * 3 + 1], points[(row + 1) * 3 + 1], amount);
+        const z = lerp(points[row * 3 + 2], points[(row + 1) * 3 + 2], amount);
+        return project(0, y, z).y - VIEW.top;
+      }
+      function progressForPointer(pointerY, flip) {
+        if (pointerY >= flip.grabY) return 0;
+        let low = 0,
+          high = CONFIG.APPEARANCE.DRAG_LIMIT;
+        for (let i = 0; i < CONFIG.PRECISION.SOLVER_ITERATIONS; i++) {
+          const mid = (low + high) / 2;
+          if (grabHeight(mid, flip) > pointerY) low = mid;
+          else high = mid;
+        }
+        return (low + high) / 2;
+      }
+      function progressForRollPointer(pointerY, flip) {
+        const rollDragRange = SIZE.height * CONFIG.APPEARANCE.ROLL_DRAG_FACTOR;
+        const dragged = Math.max(0, pointerY - flip.startY);
+        return clamp(1 - dragged / rollDragRange, 0, 1);
+      }
+
+
+      class PaperRenderer {
+        constructor(canvas) {
+          this.canvas = canvas;
+          this.textures = new Map();
+          this.ready = new Map();
+          this.rows = CONFIG.PRECISION.MESH_ROWS;
+          this.columns = CONFIG.PRECISION.MESH_COLUMNS;
+          this.placeholderTexture = null;
+          try {
+            this.gl = canvas.getContext("webgl", { alpha: true, antialias: true, premultipliedAlpha: true });
+            if (!this.gl) throw new Error("WebGL unavailable");
+            this.initializeGL();
+          } catch (error) {
+            if (this.gl) {
+              this.canvas = canvas.cloneNode(false);
+              canvas.replaceWith(this.canvas);
+            }
+            this.gl = null;
+            this.context = this.canvas.getContext("2d");
+            this.rows = CONFIG.PRECISION.MESH_ROWS_FALLBACK;
+            this.columns = CONFIG.PRECISION.MESH_COLUMNS_FALLBACK;
+          }
+          this.buildBuffers();
+          this.canvas.addEventListener("webglcontextlost", (event) => {
+            event.preventDefault();
+            this.lost = true;
+            cancelImmediately();
+          });
+          this.canvas.addEventListener("webglcontextrestored", () => {
+            this.textures.clear();
+            this.ready.clear();
+            this.placeholderTexture = null;
+            this.initializeGL();
+            this.buildBuffers();
+            this.lost = false;
+            resize();
+          });
+        }
+        invalidate(index) {
+          if (this.gl && !this.lost && this.textures.has(index)) {
+            this.gl.deleteTexture(this.textures.get(index));
+            this.textures.delete(index);
+            this.ready.delete(index);
+          }
+        }
+        prepare(index) {
+          if (this.gl && !this.lost && texStore.has(index)) this.texture(index);
+        }
+        initializeGL() {
+          const gl = this.gl;
+          const eyeDist = CONFIG.APPEARANCE.PERSPECTIVE.toFixed(1);
+          const eyeDist2x = (CONFIG.APPEARANCE.PERSPECTIVE * 2).toFixed(1);
+          const backOpacity = CONFIG.APPEARANCE.BACKFACE_OPACITY.toFixed(2);
+          const vertexSource = `
+          attribute vec3 aPosition;
+          attribute vec2 aUV;
+          attribute vec3 aNormal;
+          uniform vec2 uViewport;
+          varying vec2 vUV;
+          varying vec3 vNormal;
+          varying vec3 vPosition;
+          void main() {
+            float eyeDistance = ${eyeDist} - aPosition.z;
+            vec2 origin = vec2(${VIEW.left + SIZE.width / 2}, ${VIEW.top + SIZE.height});
+            vec2 center = vec2(${SIZE.width / 2}, ${SIZE.height});
+            float x = (2.0 * origin.x / uViewport.x - 1.0) * eyeDistance
+              + ${eyeDist2x} * (aPosition.x - center.x) / uViewport.x;
+            float y = (1.0 - 2.0 * origin.y / uViewport.y) * eyeDistance
+              - ${eyeDist2x} * (aPosition.y - center.y) / uViewport.y;
+            float depth = (4100.0 / 3900.0) * eyeDistance - (800000.0 / 3900.0);
+            gl_Position = vec4(x, y, depth, eyeDistance);
+            vUV = aUV; vNormal = aNormal; vPosition = aPosition;
+          }
+        `;
+          const fragmentSource = `
+          precision mediump float;
+          uniform sampler2D uPrint;
+          uniform float uSurface;
+          uniform vec3 uShadow;
+          varying vec2 vUV;
+          varying vec3 vNormal;
+          varying vec3 vPosition;
+          void main() {
+            if (uSurface <= 0.5) {
+              float shadowDistance = (vPosition.y - uShadow.x) / max(1.0, uShadow.y);
+              float shadow = exp(-shadowDistance * shadowDistance) * uShadow.z;
+              float alpha = clamp(shadow * (1.0 - 0.28 * abs(vUV.x - 0.5)), 0.0, 0.42);
+              gl_FragColor = vec4(0.0, 0.0, 0.0, alpha);
+              return;
+            }
+            vec3 color = texture2D(uPrint, vUV).rgb;
+            if (uSurface > 1.5) {
+              gl_FragColor = vec4(color, 1.0);
+              return;
+            }
+            vec3 normal = normalize(vNormal);
+            vec3 view = normalize(vec3(210.0 / ${eyeDist}, 0.3, 1.0) - vPosition / ${eyeDist});
+            if (dot(normal, view) < 0.0) {
+              normal = -normal;
+              color = vec3(0.941, 0.929, 0.898) * mix(vec3(1.0), color, ${backOpacity});
+            }
+            float light = max(0.0, dot(normal, normalize(vec3(-0.16, -0.38, 1.0))));
+            color *= clamp(0.70 + 0.325 * light, 0.70, 1.0);
+            gl_FragColor = vec4(color, 1.0);
+          }
+        `;
+          const compile = (type, source) => {
+            const shader = gl.createShader(type);
+            gl.shaderSource(shader, source);
+            gl.compileShader(shader);
+            if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(shader));
+            return shader;
+          };
+          const vertex = compile(gl.VERTEX_SHADER, vertexSource);
+          const fragment = compile(gl.FRAGMENT_SHADER, fragmentSource);
+          this.program = gl.createProgram();
+          gl.attachShader(this.program, vertex);
+          gl.attachShader(this.program, fragment);
+          gl.linkProgram(this.program);
+          if (!gl.getProgramParameter(this.program, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(this.program));
+          gl.deleteShader(vertex);
+          gl.deleteShader(fragment);
+          gl.useProgram(this.program);
+          this.locations = {};
+          for (const name of ["aPosition", "aUV", "aNormal"]) this.locations[name] = gl.getAttribLocation(this.program, name);
+          for (const name of ["uViewport", "uSurface", "uPrint", "uShadow"]) this.locations[name] = gl.getUniformLocation(this.program, name);
+          gl.enable(gl.DEPTH_TEST);
+          gl.depthFunc(gl.LEQUAL);
+          gl.enable(gl.BLEND);
+          gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+          gl.disable(gl.CULL_FACE);
+          gl.clearColor(0, 0, 0, 0);
+          gl.uniform1i(this.locations.uPrint, 0);
+        }
+        buildBuffers() {
+          const { rows, columns } = this;
+          this.vertices = new Float32Array((rows + 1) * (columns + 1) * 8);
+          const indices = [];
+          for (let row = 0; row < rows; row++) {
+            for (let column = 0; column < columns; column++) {
+              const a = row * (columns + 1) + column,
+                b = a + 1,
+                c = a + columns + 1,
+                d = c + 1;
+              indices.push(a, b, c, b, d, c);
+            }
+          }
+          this.indices = new Uint16Array(indices);
+          const hingeY = CONFIG.APPEARANCE.HINGE_HEIGHT - 2;
+          const hingeV = hingeY / SIZE.height;
+          this.flat = new Float32Array([
+            0, hingeY, -0.8, 0, hingeV, 0, 0, 1,
+            SIZE.width, hingeY, -0.8, 1, hingeV, 0, 0, 1,
+            0, SIZE.height, -0.8, 0, 1, 0, 0, 1,
+            SIZE.width, SIZE.height, -0.8, 1, 1, 0, 0, 1,
+          ]);
+          this.flatIndices = new Uint16Array([0, 1, 2, 1, 3, 2]);
+          this.rollSegments = CONFIG.PRECISION.ROLL_SEGMENTS;
+          this.rollVertices = new Float32Array((this.rollSegments + 1) * 2 * 8);
+          const rollIndices = [];
+          for (let j = 0; j < this.rollSegments; j++) {
+            const a = j * 2,
+              b = a + 1,
+              c = a + 2,
+              d = a + 3;
+            rollIndices.push(a, b, c, b, d, c);
+          }
+          this.rollIndices = new Uint16Array(rollIndices);
+          if (!this.gl) return;
+          const gl = this.gl;
+          this.vertexBuffer = gl.createBuffer();
+          this.indexBuffer = gl.createBuffer();
+          this.flatBuffer = gl.createBuffer();
+          this.flatIndexBuffer = gl.createBuffer();
+          this.rollBuffer = gl.createBuffer();
+          this.rollIndexBuffer = gl.createBuffer();
+          gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
+          gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, this.indices, gl.STATIC_DRAW);
+          gl.bindBuffer(gl.ARRAY_BUFFER, this.flatBuffer);
+          gl.bufferData(gl.ARRAY_BUFFER, this.flat, gl.STATIC_DRAW);
+          gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.flatIndexBuffer);
+          gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, this.flatIndices, gl.STATIC_DRAW);
+          gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.rollIndexBuffer);
+          gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, this.rollIndices, gl.STATIC_DRAW);
+        }
+        resize(density) {
+          this.density = density;
+          this.canvas.width = Math.ceil(VIEW.width * density);
+          this.canvas.height = Math.ceil(VIEW.height * density);
+          Object.assign(this.canvas.style, {
+            left: `${-VIEW.left}px`,
+            top: `${-VIEW.top}px`,
+            width: `${VIEW.width}px`,
+            height: `${VIEW.height}px`,
+          });
+          if (this.gl && !this.lost) {
+            this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+            this.gl.uniform2f(this.locations.uViewport, VIEW.width, VIEW.height);
+          }
+        }
+        updateGeometry(progress, flip) {
+          const { rows, columns, vertices } = this;
+          const radius = coverRadius(progress);
+          for (let col = 0; col <= columns; col++) {
+            const points = columnPoints(progress, (col / columns) * 2 - 1, flip.grip, radius, rows);
+            for (let row = 0; row <= rows; row++) {
+              const offset = (row * (columns + 1) + col) * 8;
+              const yShift = row === 0 ? 2 : 0;
+              vertices[offset] = points[row * 3];
+              vertices[offset + 1] = points[row * 3 + 1] - yShift;
+              vertices[offset + 2] = points[row * 3 + 2];
+              vertices[offset + 3] = col / columns;
+              vertices[offset + 4] = (CONFIG.APPEARANCE.HINGE_HEIGHT - yShift + (row / rows) * (SIZE.height - CONFIG.APPEARANCE.HINGE_HEIGHT)) / SIZE.height;
+            }
+          }
+          for (let row = 0; row <= rows; row++) {
+            for (let col = 0; col <= columns; col++) {
+              const offset = (row * (columns + 1) + col) * 8;
+              const left = (row * (columns + 1) + Math.max(0, col - 1)) * 8;
+              const right = (row * (columns + 1) + Math.min(columns, col + 1)) * 8;
+              const up = (Math.max(0, row - 1) * (columns + 1) + col) * 8;
+              const down = (Math.min(rows, row + 1) * (columns + 1) + col) * 8;
+              const ax = vertices[right] - vertices[left],
+                ay = vertices[right + 1] - vertices[left + 1],
+                az = vertices[right + 2] - vertices[left + 2];
+              const bx = vertices[down] - vertices[up],
+                by = vertices[down + 1] - vertices[up + 1],
+                bz = vertices[down + 2] - vertices[up + 2];
+              const nx = ay * bz - az * by,
+                ny = az * bx - ax * bz,
+                nz = ax * by - ay * bx;
+              const length = Math.sqrt(nx * nx + ny * ny + nz * nz) || 1;
+              vertices[offset + 5] = nx / length;
+              vertices[offset + 6] = ny / length;
+              vertices[offset + 7] = nz / length;
+            }
+          }
+        }
+        updateRoll(radius) {
+          const { rollSegments: segments, rollVertices: vertices } = this;
+          for (let j = 0; j <= segments; j++) {
+            const phi = Math.PI * (j / segments - 0.5);
+            const y = radius + radius * Math.sin(phi);
+            const z = radius * Math.cos(phi);
+            for (let side = 0; side < 2; side++) {
+              const offset = (j * 2 + side) * 8;
+              vertices[offset] = side ? SIZE.width + 1 : -1;
+              vertices[offset + 1] = y;
+              vertices[offset + 2] = z;
+              vertices[offset + 7] = 1;
+            }
+          }
+        }
+        getPlaceholderTexture() {
+          if (this.placeholderTexture) return this.placeholderTexture;
+          const gl = this.gl;
+          this.placeholderTexture = gl.createTexture();
+          gl.bindTexture(gl.TEXTURE_2D, this.placeholderTexture);
+          gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+          gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, BLANK);
+          return this.placeholderTexture;
+        }
+        texture(index) {
+          if (this.textures.has(index) && this.ready.get(index)) return this.textures.get(index);
+          if (!texStore.has(index)) {
+            return this.getPlaceholderTexture();
+          }
+          if (this.textures.has(index)) {
+            this.gl.deleteTexture(this.textures.get(index));
+            this.textures.delete(index);
+          }
+          const gl = this.gl;
+          const texture = gl.createTexture();
+          gl.bindTexture(gl.TEXTURE_2D, texture);
+          gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+          gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, pagePrint(index));
+          this.textures.set(index, texture);
+          this.ready.set(index, true);
+          return texture;
+        }
+        bindAttributes(buffer) {
+          const gl = this.gl;
+          gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+          for (const [name, count, offset] of [
+            ["aPosition", 3, 0],
+            ["aUV", 2, 12],
+            ["aNormal", 3, 20],
+          ]) {
+            gl.enableVertexAttribArray(this.locations[name]);
+            gl.vertexAttribPointer(this.locations[name], count, gl.FLOAT, false, 32, offset);
+          }
+        }
+        render(progress, flip) {
+          if (this.lost) return;
+          this.canvas.hidden = false;
+          this.updateGeometry(progress, flip);
+          const cover = coverRadius(progress);
+          const flipIndex = flip && flip.flipIndex !== undefined ? flip.flipIndex : state.index;
+          const underIndex = flip && flip.underIndex !== undefined ? flip.underIndex : state.index + 1;
+          if (!this.gl) {
+            this.render2D(cover, flipIndex, underIndex);
+            return;
+          }
+          const gl = this.gl;
+          gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+          gl.useProgram(this.program);
+          gl.activeTexture(gl.TEXTURE0);
+          this.updateRoll(cover);
+          this.bindAttributes(this.rollBuffer);
+          gl.bufferData(gl.ARRAY_BUFFER, this.rollVertices, gl.DYNAMIC_DRAW);
+          gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.rollIndexBuffer);
+          gl.colorMask(false, false, false, false);
+          gl.drawElements(gl.TRIANGLES, this.rollIndices.length, gl.UNSIGNED_SHORT, 0);
+          gl.colorMask(true, true, true, true);
+          gl.bindTexture(gl.TEXTURE_2D, this.texture(underIndex));
+          this.bindAttributes(this.flatBuffer);
+          gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.flatIndexBuffer);
+          gl.uniform1f(this.locations.uSurface, 2);
+          gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0);
+          gl.uniform1f(this.locations.uSurface, 0);
+          const shadowY = clamp(grabHeight(progress, { ...flip, grabY: SIZE.height }), 0, SIZE.height);
+          gl.uniform3f(this.locations.uShadow, shadowY, 28 + 115 * Math.sin(Math.PI * progress), 0.28 * Math.max(0, Math.sin(TAU * progress)));
+          gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0);
+          this.bindAttributes(this.vertexBuffer);
+          gl.bufferData(gl.ARRAY_BUFFER, this.vertices, gl.DYNAMIC_DRAW);
+          gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
+          gl.bindTexture(gl.TEXTURE_2D, this.texture(flipIndex));
+          gl.uniform1f(this.locations.uSurface, 1);
+          gl.drawElements(gl.TRIANGLES, this.indices.length, gl.UNSIGNED_SHORT, 0);
+        }
+        render2D(cover, flipIndex, underIndex) {
+          const fi = flipIndex !== undefined ? flipIndex : state.index;
+          const ui = underIndex !== undefined ? underIndex : state.index + 1;
+          const ctx = this.context;
+          ctx.setTransform(1, 0, 0, 1, 0, 0);
+          ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+          ctx.setTransform(this.density, 0, 0, this.density, 0, 0);
+          const triangles = [];
+          const collect = (vertices, indices, flat) => {
+            for (let i = 0; i < indices.length; i += 3) {
+              const points = [];
+              let depth = 0,
+                normalY = 0,
+                normalZ = 0,
+                tucked = 0;
+              for (let j = 0; j < 3; j++) {
+                const offset = indices[i + j] * 8;
+                const p = project(vertices[offset], vertices[offset + 1], vertices[offset + 2]);
+                points.push({ ...p, u: vertices[offset + 3], v: vertices[offset + 4] });
+                depth += vertices[offset + 2];
+                normalY += vertices[offset + 6];
+                normalZ += vertices[offset + 7];
+                if (Math.hypot(vertices[offset + 1] - cover, vertices[offset + 2]) < cover) tucked++;
+              }
+              if (!flat && tucked === 3) continue;
+              triangles.push({ points, depth: depth / 3, flat, back: normalZ < 0, light: clamp(0.7 + (0.325 * Math.abs((normalZ - normalY * 0.38) / 3)) / 1.07, 0.7, 1) });
+            }
+          };
+          collect(this.flat, this.flatIndices, true);
+          collect(this.vertices, this.indices, false);
+          triangles.sort((a, b) => a.depth - b.depth);
+          for (const triangle of triangles) {
+            const source = triangle.flat ? pagePrint(ui) : triangle.back ? backPrint(fi) : pagePrint(fi);
+            this.drawTriangle(ctx, source, triangle.points, triangle.flat ? 1 : triangle.light);
+          }
+        }
+        drawTriangle(ctx, image, points, light) {
+          const [p0, p1, p2] = points;
+          const u0 = p0.u * image.width,
+            v0 = p0.v * image.height;
+          const du1 = (p1.u - p0.u) * image.width,
+            dv1 = (p1.v - p0.v) * image.height;
+          const du2 = (p2.u - p0.u) * image.width,
+            dv2 = (p2.v - p0.v) * image.height;
+          const determinant = du1 * dv2 - du2 * dv1;
+          if (Math.abs(determinant) < 0.001) return;
+          const a = ((p1.x - p0.x) * dv2 - (p2.x - p0.x) * dv1) / determinant;
+          const b = ((p1.y - p0.y) * dv2 - (p2.y - p0.y) * dv1) / determinant;
+          const c = (du1 * (p2.x - p0.x) - du2 * (p1.x - p0.x)) / determinant;
+          const d = (du1 * (p2.y - p0.y) - du2 * (p1.y - p0.y)) / determinant;
+          const cx = (p0.x + p1.x + p2.x) / 3,
+            cy = (p0.y + p1.y + p2.y) / 3;
+          ctx.save();
+          ctx.beginPath();
+          points.forEach((p, i) => {
+            const length = Math.hypot(p.x - cx, p.y - cy) || 1;
+            const x = p.x + ((p.x - cx) / length) * 0.35,
+              y = p.y + ((p.y - cy) / length) * 0.35;
+            if (i) ctx.lineTo(x, y);
+            else ctx.moveTo(x, y);
+          });
+          ctx.closePath();
+          ctx.clip();
+          ctx.save();
+          ctx.transform(a, b, c, d, p0.x - a * u0 - c * v0, p0.y - b * u0 - d * v0);
+          ctx.drawImage(image, 0, 0);
+          ctx.restore();
+          if (light < 0.999) {
+            ctx.fillStyle = `rgba(0,0,0,${1 - light})`;
+            ctx.fill();
+          }
+          ctx.restore();
+        }
+        prune() {
+          for (const [index] of this.textures) {
+            if (index < state.index - 2 || index > state.index + 2) this.invalidate(index);
+          }
+        }
+      }
+      const renderer = new PaperRenderer($("paper-canvas"));
+
+
+      function cleanRectangle() {
+        return [
+          { x: 0, y: 0 },
+          { x: SIZE.width, y: 0 },
+          { x: SIZE.width, y: SIZE.height },
+          { x: 0, y: SIZE.height },
+        ];
+      }
+      function clipPolygon(polygon, mx, my, nx, ny, positive) {
+        const out = [];
+        for (let i = 0; i < polygon.length; i++) {
+          const a = polygon[i],
+            b = polygon[(i + 1) % polygon.length];
+          const da = (a.x - mx) * nx + (a.y - my) * ny;
+          const db = (b.x - mx) * nx + (b.y - my) * ny;
+          const insideA = positive ? da >= 0 : da <= 0;
+          const insideB = positive ? db >= 0 : db <= 0;
+          if (insideA) out.push(a);
+          if (insideA !== insideB) {
+            const t = da / (da - db);
+            out.push({ x: lerp(a.x, b.x, t), y: lerp(a.y, b.y, t) });
+          }
+        }
+        return out;
+      }
+      function tornOutline(distance, side) {
+        if (distance <= 12) return cleanRectangle();
+        const fraction = smoothstep(12, 270, distance);
+        const result = [];
+        const step = CONFIG.PRECISION.TEAR_STEP;
+        for (let x = 0; x <= SIZE.width; x += step) {
+          const fromSide = side === "left" ? x : SIZE.width - x;
+          const broken = 1 - smoothstep(fraction * SIZE.width - 14, fraction * SIZE.width + 2, fromSide);
+          result.push({ x, y: (12 + noise(x + state.index * 23) * 10) * broken });
+        }
+        result.push({ x: SIZE.width, y: SIZE.height }, { x: 0, y: SIZE.height });
+        return result;
+      }
+      function tearGeometry(point, origin, side) {
+        const dx = origin.x - point.x,
+          dy = origin.y - point.y;
+        const distance = Math.hypot(dx, dy);
+        if (distance < 0.7) return null;
+        const nx = dx / distance,
+          ny = dy / distance;
+        const mx = (point.x + origin.x) / 2,
+          my = (point.y + origin.y) / 2;
+        const outline = tornOutline(distance, side);
+        const flat = clipPolygon(outline, mx, my, nx, ny, false);
+        const lifted = clipPolygon(outline, mx, my, nx, ny, true);
+        const reflected = lifted.map((p) => {
+          const d = (p.x - mx) * nx + (p.y - my) * ny;
+          return { x: p.x - 2 * nx * d, y: p.y - 2 * ny * d };
+        });
+        return { distance, nx, ny, mx, my, flat, lifted, reflected, point };
+      }
+      function pathPolygon(ctx, points) {
+        ctx.beginPath();
+        points.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
+        ctx.closePath();
+      }
+      function clearTear() {
+        tearCanvas.hidden = true;
+        tearContext.setTransform(1, 0, 0, 1, 0, 0);
+        tearContext.clearRect(0, 0, tearCanvas.width, tearCanvas.height);
+        currentCanvas.style.clipPath = "none";
+      }
+      function renderTear(point) {
+        if (!state.tear) return;
+        const geometry = tearGeometry(point, state.tear.origin, state.tear.side);
+        if (!geometry || geometry.lifted.length < 3) {
+          clearTear();
+          return;
+        }
+        tearCanvas.hidden = false;
+        const ctx = tearContext;
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.clearRect(0, 0, tearCanvas.width, tearCanvas.height);
+        ctx.setTransform(pixelRatio, 0, 0, pixelRatio, tearView.left * pixelRatio, tearView.top * pixelRatio);
+        currentCanvas.style.clipPath = geometry.flat.length >= 3 ? `polygon(${geometry.flat.map((p) => `${p.x.toFixed(2)}px ${p.y.toFixed(2)}px`).join(",")})` : "inset(100% 0 0 0)";
+        const curlRadius = clamp(14 + geometry.distance * 0.07, 14, 52);
+        const strength = clamp(geometry.distance / 150, 0, 1);
+        ctx.save();
+        pathPolygon(ctx, geometry.lifted);
+        ctx.clip();
+        const shadow = ctx.createLinearGradient(geometry.mx, geometry.my, geometry.mx + geometry.nx * curlRadius * 1.7, geometry.my + geometry.ny * curlRadius * 1.7);
+        shadow.addColorStop(0, `rgba(30,29,24,${strength * 0.3})`);
+        shadow.addColorStop(1, "rgba(30,29,24,0)");
+        ctx.fillStyle = shadow;
+        ctx.fillRect(0, 0, SIZE.width, SIZE.height);
+        ctx.restore();
+        ctx.save();
+        pathPolygon(ctx, geometry.reflected);
+        ctx.shadowColor = `rgba(0,0,0,${0.2 * strength})`;
+        ctx.shadowBlur = 15 * pixelRatio;
+        ctx.shadowOffsetY = 7 * pixelRatio;
+        ctx.fillStyle = "#f0ede5";
+        ctx.fill();
+        ctx.shadowColor = "transparent";
+        ctx.clip();
+        ctx.save();
+        ctx.translate(geometry.mx, geometry.my);
+        ctx.transform(1 - 2 * geometry.nx * geometry.nx, -2 * geometry.nx * geometry.ny, -2 * geometry.nx * geometry.ny, 1 - 2 * geometry.ny * geometry.ny, 0, 0);
+        ctx.translate(-geometry.mx, -geometry.my);
+        ctx.drawImage(backPrint(state.index), 0, 0, SIZE.width, SIZE.height);
+        ctx.restore();
+        const shade = ctx.createLinearGradient(geometry.mx, geometry.my, geometry.mx - geometry.nx * curlRadius * 2, geometry.my - geometry.ny * curlRadius * 2);
+        shade.addColorStop(0, "rgba(57,51,39,.25)");
+        shade.addColorStop(0.28, "rgba(255,255,255,.38)");
+        shade.addColorStop(0.75, "rgba(255,255,255,0)");
+        shade.addColorStop(1, "rgba(42,37,27,.025)");
+        ctx.fillStyle = shade;
+        ctx.fill();
+        ctx.restore();
+        pathPolygon(ctx, geometry.reflected);
+        ctx.strokeStyle = "rgba(172,163,143,.45)";
+        ctx.lineWidth = 0.6;
+        ctx.stroke();
+      }
+
+
+      function grabZone(point) {
+
+        if (point.x < 0 || point.x > SIZE.width || point.y > SIZE.height + 24) return null;
+        if (point.y < CONFIG.APPEARANCE.HINGE_HEIGHT + 2) return null;
+        const bottom = point.y >= SIZE.height - 170;
+        const side = point.x <= 94 ? "left" : point.x >= SIZE.width - 94 ? "right" : null;
+        return { bottom, side };
+      }
+      function grabRollZone(point) {
+        if (state.index <= MIN_INDEX) return false;
+        if (point.x < -12 || point.x > SIZE.width + 12) return false;
+        return point.y < CONFIG.APPEARANCE.HINGE_HEIGHT + 2;
+      }
+      function resolveGesture(grab, dx, dy, slop) {
+        const upward = -dy;
+        const ax = Math.abs(dx);
+        const inward = grab.side === "left" ? dx : grab.side === "right" ? -dx : 0;
+        if (Math.hypot(dx, dy) < slop) return null;
+
+        if (upward >= slop * 0.8) {
+          if (!grab.side && upward > ax * 0.7) return "flip";
+          if (grab.side && upward > ax * 1.2) return "flip";
+        }
+
+        if (grab.side) {
+
+          if (grab.bottom && upward >= slop * 0.8 && inward >= slop * 0.4) return "tear";
+          if (inward >= slop * 0.6) {
+            if (dy <= 0 && upward <= inward * 1.0) return "tear";
+            if (dy > 0 && dy <= inward * 0.35) return "tear";
+          }
+        }
+        return null;
+      }
+      function localPoint(event) {
+        const rect = book.getBoundingClientRect();
+        return { x: (event.clientX - rect.left) / scale, y: (event.clientY - rect.top) / scale };
+      }
+      function beginFlip(point, flipIndex, underIndex) {
+        ++paintVersion;
+        clearTear();
+        state.flip = {
+          progress: 0,
+          target: 0,
+          grip: clamp((point.x / SIZE.width) * 2 - 1, -1, 1),
+          grabY: point.y,
+          flipIndex: flipIndex !== undefined ? flipIndex : state.index,
+          underIndex: underIndex !== undefined ? underIndex : state.index + 1,
+        };
+        applyThemeForIndex(state.flip.underIndex);
+        setMode("flip");
+        renderer.render(0, state.flip);
+      }
+      function beginTear() {
+        ++paintVersion;
+        const side = state.grab.side;
+        const origin = { x: side === "left" ? 0 : SIZE.width, y: state.down.y };
+        state.tear = { side, origin, current: { ...origin }, target: { ...origin } };
+        applyThemeForIndex(state.index + 1);
+        paintRestingCanvas(nextCanvas, state.index + 1);
+        renderer.canvas.hidden = true;
+        setMode("tear");
+      }
+
+      function beginRollBack(point) {
+        if (state.index <= MIN_INDEX || renderer.lost) return;
+        const originalIndex = state.index;
+        const target = originalIndex - 1;
+        if (!texStore.has(target) || !texStore.has(originalIndex)) return;
+        ++paintVersion;
+        clearTear();
+        state.index = target;
+        rebuildRoll(target);
+        rollKey = "";
+        applyThemeForIndex(target);
+        nextCanvas.width = TEX.width;
+        nextCanvas.height = TEX.height;
+        nextCanvas.getContext("2d").drawImage(pagePrint(originalIndex), 0, 0);
+        state.flip = {
+          progress: 1,
+          target: 1,
+          grip: 0,
+          grabY: SIZE.height,
+          flipIndex: target,
+          underIndex: originalIndex,
+          isBack: true,
+          originalIndex,
+          startY: point.y,
+        };
+        setMode("flip");
+        renderer.render(1, state.flip);
+        syncRollWithFlip(1);
+      }
+      function requestFrame() {
+        if (!state.frame) {
+          state.lastFrame = performance.now();
+          state.frame = requestAnimationFrame(frame);
+        }
+      }
+      function updatePointer(event) {
+        if (event.pointerId !== state.pointer || !["pending", "flip", "tear"].includes(state.mode)) return;
+        const point = localPoint(event);
+        const now = performance.now();
+        const elapsed = Math.max(1, now - state.last.time);
+        if (Math.hypot(point.x - state.last.x, point.y - state.last.y) > 0.02) {
+          const weight = elapsed > 100 ? 1 : 0.45;
+          state.velocity.x = lerp(state.velocity.x, (point.x - state.last.x) / elapsed, weight);
+          state.velocity.y = lerp(state.velocity.y, (point.y - state.last.y) / elapsed, weight);
+          state.last = { ...point, time: now };
+        }
+        const dx = point.x - state.down.x,
+          dy = point.y - state.down.y;
+        if (state.mode === "pending") {
+          if (state.grab && state.grab.rollBack) {
+            if (dy > 6 / scale) beginRollBack(state.down);
+          } else {
+            const action = resolveGesture(state.grab, dx, dy, 6 / scale);
+            if (action === "flip" && !renderer.lost && state.index < MAX_INDEX) beginFlip(state.down);
+            else if (action === "tear" && state.index < MAX_INDEX) beginTear();
+          }
+        }
+        if (state.mode === "flip") {
+          state.flip.target = state.flip.isBack ? progressForRollPointer(point.y, state.flip) : progressForPointer(point.y, state.flip);
+        }
+        if (state.mode === "tear") {
+          const inward = state.tear.side === "left" ? dx : -dx;
+          const maxDown = Math.max(0, inward * 0.35);
+          state.tear.target = {
+            x: clamp(state.tear.origin.x + dx, -SIZE.width * 2, SIZE.width * 3),
+            y: clamp(state.tear.origin.y + Math.min(maxDown, dy), -SIZE.height * 2, SIZE.height * 2),
+          };
+        }
+        if (state.mode === "flip" || state.mode === "tear") requestFrame();
+      }
+      function releaseCapture() {
+        const pointer = state.pointer;
+        state.pointer = null;
+        if (pointer !== null && book.hasPointerCapture(pointer)) book.releasePointerCapture(pointer);
+      }
+      function settleFlip(complete, targetIndex, speedMultiplier = 1) {
+        if (!state.flip) return;
+        state.tween = {
+          kind: "flip",
+          complete,
+          targetIndex,
+          from: state.flip.progress,
+          to: complete ? 1 : 0,
+          start: performance.now(),
+          duration: motionPreference.matches
+            ? CONFIG.ANIMATION.FLIP_REDUCED_MOTION
+            : complete
+              ? (CONFIG.ANIMATION.FLIP_COMPLETE_DURATION * (1 - state.flip.progress)) * speedMultiplier
+              : CONFIG.ANIMATION.FLIP_CANCEL_DURATION,
+        };
+        setMode("animating");
+        requestFrame();
+      }
+      function settleTear(complete) {
+        if (!state.tear) return;
+        const { origin, side, current } = state.tear;
+        state.tween = {
+          kind: "tear",
+          complete,
+          from: { ...current },
+          to: complete ? { x: origin.x + (side === "left" ? 1 : -1) * SIZE.width * 2.7, y: -SIZE.height * 1.35 } : { ...origin },
+          start: performance.now(),
+          duration: motionPreference.matches
+            ? CONFIG.ANIMATION.TEAR_REDUCED_MOTION
+            : complete
+              ? CONFIG.ANIMATION.TEAR_COMPLETE_DURATION
+              : CONFIG.ANIMATION.TEAR_CANCEL_DURATION,
+        };
+        setMode("animating");
+        requestFrame();
+      }
+      function settleRollBack(complete) {
+        if (!state.flip) return;
+        const progress = state.flip.progress;
+        state.tween = {
+          kind: "flip",
+          back: true,
+          complete: false,
+          originalIndex: state.flip.originalIndex,
+          targetIndex: complete ? state.flip.flipIndex : state.flip.originalIndex,
+          from: progress,
+          to: complete ? 0 : 1,
+          start: performance.now(),
+          duration: motionPreference.matches
+            ? CONFIG.ANIMATION.FLIP_REDUCED_MOTION
+            : complete
+              ? CONFIG.ANIMATION.ROLL_BACK_DURATION * progress
+              : CONFIG.ANIMATION.ROLL_CANCEL_DURATION * (1 - progress),
+        };
+        setMode("animating");
+        requestFrame();
+      }
+      function finishGesture(cancelled) {
+        if (!["pending", "flip", "tear"].includes(state.mode)) return;
+        releaseCapture();
+        if (state.mode === "pending") {
+          resetInteraction();
+          return;
+        }
+        const fresh = performance.now() - state.last.time < 100;
+
+        if (state.mode === "flip") {
+          if (state.flip.isBack) {
+            const dragged = state.last.y - state.down.y;
+            const completeBack = !cancelled && (dragged > 5 || (dragged > 3 && fresh && state.velocity.y > 0.25));
+            settleRollBack(completeBack);
+          } else {
+            const lift = state.down.y - state.last.y;
+
+            settleFlip(!cancelled && (lift > 3 || (lift > 1.5 && fresh && state.velocity.y < -0.15)));
+          }
+        } else {
+          const distance = Math.hypot(state.tear.target.x - state.tear.origin.x, state.tear.target.y - state.tear.origin.y);
+          const inwardVelocity = state.tear.side === "left" ? state.velocity.x : -state.velocity.x;
+          const upwardVelocity = -state.velocity.y;
+          settleTear(
+            !cancelled &&
+            (distance > Math.hypot(SIZE.width, SIZE.height) * CONFIG.APPEARANCE.TEAR_THRESHOLD_RATIO ||
+              (distance > 40 && fresh && (inwardVelocity > 0.4 || upwardVelocity > 0.4)))
+          );
+        }
+      }
+      function resetInteraction() {
+        ++actionVersion;
+        ++paintVersion;
+        releaseCapture();
+        if (state.frame) cancelAnimationFrame(state.frame);
+        state.frame = 0;
+        state.flip = null;
+        state.tear = null;
+        state.tween = null;
+        state.down = null;
+        state.sequence = [];
+        state.sequenceTotal = 0;
+        state.last = null;
+        state.grab = null;
+        state.velocity = { x: 0, y: 0 };
+        const restingData = almanac(dateOf(state.index));
+        syncCurrentDay(state.index, restingData);
+        if (texStore.has(state.index)) {
+          paintRestingCanvas(currentCanvas, state.index);
+        }
+        clearTear();
+        renderRestingPage(state.index);
+        setMode("idle");
+        drawRoll();
+      }
+      function completeAnimation(animation) {
+        if (animation.kind === "flip" && animation.back) {
+          if (animation.targetIndex !== undefined) state.index = animation.targetIndex;
+          rebuildRoll(state.index);
+          refreshExportPanel();
+        } else if (animation.complete) {
+          const from = state.index;
+          state.index = animation.targetIndex !== undefined ? animation.targetIndex : Math.min(MAX_INDEX, state.index + 1);
+          refreshExportPanel();
+          if (animation.kind === "tear") {
+            state.tornCount += state.index - from;
+            resetInteraction();
+            paintRestingPages().catch(reportTextureError);
+            renderer.prune();
+            pruneTextures();
+            return;
+          }
+          if (state.index - from > 1) rebuildRoll(state.index);
+          else state.rollFace = from;
+        }
+
+        if (state.sequence && state.sequence.length > 0) {
+          const nextTarget = state.sequence.shift();
+          executeSequenceStep(nextTarget);
+          return;
+        }
+
+        rollKey = "";
+        resetInteraction();
+        paintRestingPages().catch(reportTextureError);
+        renderer.prune();
+        pruneTextures();
+      }
+      function frame(now) {
+        state.frame = 0;
+        const elapsed = clamp(now - state.lastFrame, 1, 48);
+        state.lastFrame = now;
+        const follow = 1 - Math.exp(-elapsed / 32);
+        let continueAnimating = false;
+        if (state.mode === "flip" && state.flip) {
+          state.flip.progress = lerp(state.flip.progress, state.flip.target, follow);
+          renderer.render(state.flip.progress, state.flip);
+          syncRollWithFlip(state.flip.progress);
+          continueAnimating = Math.abs(state.flip.target - state.flip.progress) > 0.00008;
+        } else if (state.mode === "tear" && state.tear) {
+          state.tear.current.x = lerp(state.tear.current.x, state.tear.target.x, follow);
+          state.tear.current.y = lerp(state.tear.current.y, state.tear.target.y, follow);
+          renderTear(state.tear.current);
+          continueAnimating = Math.hypot(state.tear.target.x - state.tear.current.x, state.tear.target.y - state.tear.current.y) > 0.08;
+        } else if (state.mode === "animating" && state.tween) {
+          const animation = state.tween;
+          const time = clamp((now - animation.start) / animation.duration, 0, 1);
+          if (animation.kind === "flip") {
+            const eased = animation.complete || animation.back ? easeInOut(time) : easeOut(time);
+            const progress = lerp(animation.from, animation.to, eased);
+            state.flip.progress = progress;
+            renderer.render(progress, state.flip);
+            syncRollWithFlip(progress);
+          } else {
+            const eased = animation.complete ? time * time * time : easeOut(time);
+            renderTear({ x: lerp(animation.from.x, animation.to.x, eased), y: lerp(animation.from.y, animation.to.y, eased) });
+
+          }
+          if (time >= 1) completeAnimation(animation);
+          else continueAnimating = true;
+        }
+        if (continueAnimating) state.frame = requestAnimationFrame(frame);
+      }
+      function cancelImmediately() {
+        if (artBusy) return;
+        state.sequence = [];
+        state.sequenceTotal = 0;
+        if (state.tween && state.tween.back) state.index = state.tween.originalIndex;
+        else if (state.flip && state.flip.isBack) state.index = state.flip.originalIndex;
+        resetInteraction();
+        paintRestingPages().catch(reportTextureError);
+      }
+
+
+      function flipToIndex(targetIndex) {
+        if (artBusy) return;
+        const target = clamp(Math.round(targetIndex), MIN_INDEX, MAX_INDEX);
+        if (target === state.index) return;
+        if (state.mode !== "idle") cancelImmediately();
+        applyThemeForIndex(target);
+        if (renderer.lost) {
+          jumpToIndex(target);
+          return;
+        }
+
+        const diff = target - state.index;
+        const absDiff = Math.abs(diff);
+        const steps = Math.min(absDiff, 2);
+
+        if (steps <= 1) {
+          state.sequence = [];
+          state.sequenceTotal = 0;
+          executeSequenceStep(target);
+          return;
+        }
+
+        const seq = [];
+        for (let i = 1; i <= steps; i++) {
+          const stepTarget = Math.round(state.index + (diff * i) / steps);
+          seq.push(stepTarget);
+        }
+        state.sequence = seq;
+        state.sequenceTotal = steps;
+
+        executeSequenceStep(state.sequence.shift());
+      }
+
+      function executeSequenceStep(targetIndex) {
+        const target = clamp(Math.round(targetIndex), MIN_INDEX, MAX_INDEX);
+        if (target === state.index) {
+          if (state.sequence && state.sequence.length > 0) {
+            executeSequenceStep(state.sequence.shift());
+          }
+          return;
+        }
+        const request = ++actionVersion;
+        const originalIndex = state.index;
+        setMode("loading");
+
+        const speedMultiplier = state.sequenceTotal > 1 ? (1 / (state.sequenceTotal * 0.85)) : 1;
+
+        if (target > originalIndex) {
+
+          Promise.all([ensureTexture(originalIndex), ensureTexture(target)])
+            .then(() => {
+              if (request !== actionVersion || state.mode !== "loading") return;
+              nextCanvas.width = TEX.width;
+              nextCanvas.height = TEX.height;
+              nextCanvas.getContext("2d").drawImage(pagePrint(target), 0, 0);
+              beginFlip({ x: SIZE.width / 2, y: SIZE.height }, originalIndex, target);
+              settleFlip(true, target, speedMultiplier);
+            })
+            .catch((error) => failAction(error, request));
+        } else {
+
+          Promise.all([ensureTexture(target), ensureTexture(originalIndex)])
+            .then(() => {
+              if (request !== actionVersion || state.mode !== "loading") return;
+              ++paintVersion;
+              state.index = target;
+              rebuildRoll(target);
+              rollKey = "";
+              applyThemeForIndex(target);
+              nextCanvas.width = TEX.width;
+              nextCanvas.height = TEX.height;
+              nextCanvas.getContext("2d").drawImage(pagePrint(originalIndex), 0, 0);
+              clearTear();
+              state.flip = {
+                progress: 1,
+                target: 0,
+                grip: 0,
+                grabY: SIZE.height,
+                flipIndex: target,
+                underIndex: originalIndex,
+              };
+              state.tween = {
+                kind: "flip",
+                back: true,
+                complete: false,
+                originalIndex,
+                targetIndex: target,
+                from: 1,
+                to: 0,
+                start: performance.now(),
+                duration: motionPreference.matches ? CONFIG.ANIMATION.FLIP_REDUCED_MOTION : CONFIG.ANIMATION.PAGE_TURN_SLOW_DURATION * speedMultiplier,
+              };
+              setMode("animating");
+              renderer.render(1, state.flip);
+              syncRollWithFlip(1);
+              requestFrame();
+            })
+            .catch((error) => failAction(error, request));
+        }
+      }
+
+      function flipForward() {
+        if (state.index >= MAX_INDEX) return;
+        flipToIndex(state.index + 1);
+      }
+      function flipBackward() {
+        if (state.index <= MIN_INDEX) return;
+        flipToIndex(state.index - 1);
+      }
+      function tearOff() {
+        if (state.mode !== "idle" || state.index >= MAX_INDEX) return;
+        const request = ++actionVersion,
+          index = state.index;
+        setMode("loading");
+        Promise.all([ensureTexture(index), ensureTexture(index + 1)])
+          .then(() => {
+            if (request !== actionVersion || state.mode !== "loading" || state.index !== index) return;
+            state.grab = { side: "right", bottom: true };
+            state.down = { x: SIZE.width - 20, y: SIZE.height - 40 };
+            state.last = { ...state.down, time: performance.now() };
+            beginTear();
+            settleTear(true);
+          })
+          .catch((error) => failAction(error, request));
+      }
+
+      function failAction(error, request) {
+        reportTextureError(error);
+        if (request !== actionVersion) return;
+        cancelImmediately();
+        $("announcement").textContent = "页面生成失败，请重试。";
+      }
+      function jumpToIndex(target) {
+        const index = clamp(Math.round(target), MIN_INDEX, MAX_INDEX);
+        if (state.mode !== "idle") cancelImmediately();
+        state.index = index;
+        rebuildRoll(index);
+        rollKey = "";
+        resetInteraction();
+        paintRestingPages().catch(reportTextureError);
+        renderer.prune();
+        pruneTextures();
+        refreshExportPanel();
+      }
+      function goToDate(dateStr) {
+        if (!dateStr) return;
+        const date = dateStr < FIRST_DATE ? FIRST_DATE : dateStr > MAX_DATE ? MAX_DATE : dateStr;
+        const target = daysBetween(date, BASE_DATE);
+        flipToIndex(target);
+      }
+      function goToday() {
+        flipToIndex(TODAY_INDEX);
+        book.focus({ preventScroll: true });
+      }
+
+
+      const EXPORT = {
+        MAX_DAYS: 366,      // 单次导出天数上限
+        DPI: 300,           // 单日高清图目标精度
+        CHUNK: 8,           // 后台生成时每帧最多生成页数，避免长任务卡住界面
+        PRINT_SETTLE: 30000, // 清理打印 DOM 的兜底延时（毫秒）；afterprint 正常触发时会提前清理，
+
+      };
+
+
+      const PRINT_PAPER = {
+        size: `${PAGE_W_MM}mm ${PAGE_H_MM}mm`,
+        sheetH: PAGE_H_MM,
+        name: `日历原尺寸 ${PAGE_W_MM}×${PAGE_H_MM}mm`,
+      };
+      const printPaperStyle = $("print-paper");
+
+      const framedWindow = (() => {
+        try {
+          return window.self !== window.top;
+        } catch (error) {
+          return true;
+        }
+      })();
+
+      function applyPrintPaper() {
+        if (printPaperStyle) printPaperStyle.textContent = `@page { size: ${PRINT_PAPER.size}; margin: 0; }`;
+        docStyle.setProperty("--print-sheet-h", PRINT_PAPER.sheetH + "mm");
+        refreshExportPanel();
+      }
+
+      const printRoot = $("print-root");
+      const exportPanel = $("export-panel");
+      const btnDate = $("btn-date");
+      const datePanel = $("date-panel");
+      const exportOverlay = $("export-overlay");
+      const exportOverlayTitle = $("export-overlay-title");
+      const exportOverlayFill = $("export-overlay-fill");
+      const exportOverlayProgress = $("export-overlay-progress");
+      const exportSummary = $("export-summary");
+      const exportStatus = $("export-status");
+      const exportCustom = $("export-custom");
+      const exportStart = $("export-start");
+      const exportEnd = $("export-end");
+      const btnExport = $("btn-export");
+      const btnExportRun = $("btn-export-run");
+      const btnExportCancel = $("btn-export-cancel");
+      const announcement = $("announcement");
+
+      let exportRange = "day";    // day | month | year | custom
+      let exportBusy = false;     // 导出 / 打印进行中
+      let exportCanceled = false; // 后台生成过程中的取消标记
+      let printProto = null;      // 打印用原型卡片（id 已降级为 data-ref）
+      let printCleanupTimer = 0;
+      let printTitleBackup = null;
+
+      const nextFrame = () => new Promise((resolve) => requestAnimationFrame(() => resolve()));
+      const daysInMonth = (y, m) => new Date(Date.UTC(y, m, 0)).getUTCDate();
+      const clampDate = (s) => (s < FIRST_DATE ? FIRST_DATE : s > MAX_DATE ? MAX_DATE : s);
+
+
+      const anchorDate = () => dateOf(clamp(state.index, MIN_INDEX, MAX_INDEX));
+
+      function resolveRange() {
+        const base = anchorDate();
+        if (exportRange === "month") {
+          const y = +base.slice(0, 4),
+            m = +base.slice(5, 7);
+          return [`${y}-${pad(m)}-01`, `${y}-${pad(m)}-${pad(daysInMonth(y, m))}`];
+        }
+        if (exportRange === "year") {
+          const y = base.slice(0, 4);
+          return [`${y}-01-01`, `${y}-12-31`];
+        }
+        if (exportRange === "custom") {
+          const a = clampDate(exportStart.value || base),
+            b = clampDate(exportEnd.value || base);
+          return a <= b ? [a, b] : [b, a];
+        }
+        return [base, base];
+      }
+      const rangeInfo = () => {
+        const [start, end] = resolveRange();
+        return { start, end, count: daysBetween(end, start) + 1 };
+      };
+
+      function setExportStatus(kind, text) {
+        exportStatus.dataset.kind = kind || "";
+        exportStatus.textContent = text || "";
+      }
+
+      function refreshExportPanel() {
+        if (!exportPanel || exportPanel.hidden) return;
+        const info = rangeInfo();
+        const over = info.count > EXPORT.MAX_DAYS;
+        const multi = info.count > 1;
+        exportSummary.innerHTML = multi
+          ? `范围 <b>${info.start}</b> → <b>${info.end}</b>，共 <b>${info.count}</b> 天 <span class="export-note">（以当前显示日期为基准）</span>`
+          : `范围 <b>${info.start}</b>，共 <b>1</b> 天 <span class="export-note">（当前显示的那一天）</span>`;
+        const framedTip = framedWindow ? `当前页面在嵌入窗口中，浏览器可能不弹出打印对话框；若点了没反应，请在新标签页打开本页后再导出。` : "";
+        btnExportRun.textContent = multi ? `导出并打印（${info.count} 页）` : "导出高清图";
+      }
+
+
+      async function rasterizeCardAtScale(scale, card) {
+        await prepareEmbeddedFontCSS();
+        const w = Math.round(NATIVE_TEX.width * scale);
+        const h = Math.round(NATIVE_TEX.height * scale);
+        card.style.width = (PAGE_W_MM * scale).toFixed(3) + "mm";
+        card.style.height = (PAGE_H_MM * scale).toFixed(3) + "mm";
+        card.style.padding = (10 * scale).toFixed(3) + "mm";
+        await nextFrame();
+        const canvas = document.createElement("canvas");
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext("2d", { willReadFrequently: true });
+        ctx.fillStyle = "#fdfcf7";
+        ctx.fillRect(0, 0, w, h);
+        const svg =
+          `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" style="background:#fdfcf7;">` +
+          `<rect width="100%" height="100%" fill="#fdfcf7"/>` +
+          `<foreignObject width="${w}" height="${h}"><div xmlns="http://www.w3.org/1999/xhtml" lang="${document.documentElement.lang || "zh-CN"}" style="width:${w}px;height:${h}px;background:#fdfcf7;">` +
+          `<style>${collectCSS()}</style>${new XMLSerializer().serializeToString(card)}</div></foreignObject></svg>`;
+        const url = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svg)));
+        await new Promise((resolve) => {
+          const img = new Image();
+          img.onload = () => {
+            ctx.drawImage(img, 0, 0, w, h);
+            resolve();
+          };
+          img.onerror = () => resolve();
+          img.src = url;
+        });
+        return canvas;
+      }
+
+
+      async function captureHiRes(card) {
+        await card._artReady;
+        const scale = clamp(EXPORT.DPI / 96, 1, 4);
+        await acquireCaptureSlot();
+        try {
+          const targetW = Math.round(NATIVE_TEX.width * scale);
+          if (window.snapdom && typeof window.snapdom.toCanvas === "function") {
+            try {
+              const c = await window.snapdom.toCanvas(card, { backgroundColor: "#fdfcf7", embedFonts: true, scale, dpr: 1 });
+              if (c && c.width >= targetW * 0.85) return c;
+            } catch (error) {
+              console.warn("[Calendar] SnapDOM 高清抓取失败，改用 SVG foreignObject 光栅化：", error);
+            }
+          }
+          return await rasterizeCardAtScale(scale, card);
+        } finally {
+          releaseCaptureSlot();
+          card.remove();
+        }
+      }
+
+      function downloadCanvas(canvas, filename) {
+        return new Promise((resolve) => {
+          canvas.toBlob((blob) => {
+            if (!blob) {
+              resolve(null);
+              return;
+            }
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = filename;
+            a.rel = "noopener";
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 5000);
+            resolve(filename);
+          }, "image/png");
+        });
+      }
+
+
+      async function exportSingleDay(dateStr) {
+        const canvas = await captureHiRes(buildDayCard(almanac(dateStr)));
+        const filename = await downloadCanvas(canvas, `老黄历-${dateStr}.png`);
+        if (!filename) {
+          setExportStatus("error", "高清图生成失败，请重试。");
+          return;
+        }
+        setExportStatus("ok", `已导出 ${dateStr} 高清图（${canvas.width}×${canvas.height}px）。`);
+        announcement.textContent = `已导出 ${dateStr} 的高清日历图。`;
+      }
+
+
+      function getPrintProto() {
+        if (!printProto) {
+          const proto = tpl.cloneNode(true);
+          proto.removeAttribute("id");
+          proto.removeAttribute("style");
+          proto.classList.remove("weekend");
+          refifyIds(proto);
+          printProto = proto;
+        }
+        return printProto;
+      }
+
+      async function buildPrintPages(start, end, count) {
+        syncPrintAliases();
+        const proto = getPrintProto();
+        printRoot.textContent = "";
+        const fragment = document.createDocumentFragment();
+        for (let i = 0; i < count; i++) {
+          const page = document.createElement("div");
+          page.className = "print-page";
+          const card = proto.cloneNode(true);
+          const data = almanac(shiftDate(start, i));
+          fillCard(card, data);
+          await prepareCalendarArt(card, data);
+          page.appendChild(card);
+          fragment.appendChild(page);
+          if (i % EXPORT.CHUNK === EXPORT.CHUNK - 1) {
+            updateExportOverlay(i + 1, count);
+            await nextFrame();
+            if (exportCanceled) return null;
+          }
+        }
+        printRoot.appendChild(fragment);
+
+        document.documentElement.setAttribute("data-print-ready", "1");
+        updateExportOverlay(count, count);
+        return count;
+      }
+
+      async function waitForFontsAndLayout() {
+        try {
+          if (document.fonts && document.fonts.ready) await document.fonts.ready;
+        } catch (error) {
+
+        }
+        await nextFrame();
+        await nextFrame();
+      }
+
+      function schedulePrintCleanup(delay) {
+        if (printCleanupTimer) window.clearTimeout(printCleanupTimer);
+        printCleanupTimer = window.setTimeout(() => {
+          printCleanupTimer = 0;
+          printRoot.textContent = "";
+          document.documentElement.removeAttribute("data-print-ready");
+          if (printTitleBackup !== null) {
+            document.title = printTitleBackup;
+            printTitleBackup = null;
+          }
+        }, delay);
+      }
+
+      function printPages(title) {
+        printTitleBackup = document.title;
+        document.title = title;
+        window.addEventListener("afterprint", () => schedulePrintCleanup(400), { once: true });
+        try {
+          window.print();
+        } catch (error) {
+          console.warn("[Calendar] 唤起打印失败：", error);
+        }
+
+        schedulePrintCleanup(EXPORT.PRINT_SETTLE);
+      }
+
+
+      function showExportOverlay(title, total) {
+        exportCanceled = false;
+        exportOverlayTitle.textContent = title;
+        exportOverlayProgress.textContent = total > 1 ? `0 / ${total}` : "准备中…";
+        exportOverlayFill.style.width = "4%";
+        exportOverlay.hidden = false;
+        btnExportCancel.disabled = false;
+      }
+      function updateExportOverlay(done, total) {
+        exportOverlayProgress.textContent = `${done} / ${total}`;
+        exportOverlayFill.style.width = `${Math.round((done / total) * 100)}%`;
+      }
+      function hideExportOverlay() {
+        exportOverlay.hidden = true;
+      }
+
+      async function startExport() {
+        if (exportBusy || artBusy) return;
+        if (!HAS_LUNAR) {
+          setExportStatus("error", "历法数据（lunar.js）未加载，暂时无法导出。");
+          return;
+        }
+        const info = rangeInfo();
+        if (info.count > EXPORT.MAX_DAYS) {
+          setExportStatus("error", `单次最多导出 ${EXPORT.MAX_DAYS} 天，请缩短范围。`);
+          return;
+        }
+        const multi = info.count > 1;
+        exportBusy = true;
+        btnExportRun.disabled = true;
+        setExportStatus("", multi ? "正在后台生成打印页面…" : "正在生成高清图…");
+        showExportOverlay(multi ? `正在生成 ${info.count} 天打印页面…` : "正在生成高清图…", info.count);
+        try {
+          if (!multi) {
+            await exportSingleDay(info.start);
+            hideExportOverlay();
+            closeExportPanel();
+          } else {
+            const built = await buildPrintPages(info.start, info.end, info.count);
+            hideExportOverlay();
+            if (built === null) {
+              setExportStatus("", "已取消导出。");
+            } else {
+              await waitForFontsAndLayout();
+              printPages(`老黄历 ${info.start} 至 ${info.end}`);
+              closeExportPanel();
+              setExportStatus(
+                "ok",
+                `已生成 ${info.count} 页，纸张 ${PRINT_PAPER.name}（一页一天）；` +
+                `在打印对话框中选择“另存为 PDF”，并勾选“背景图形”、取消“页眉和页脚”。` +
+                (framedWindow ? "若未弹出打印窗口，请在新标签页打开本页重试。" : ""),
+              );
+              announcement.textContent = `已生成 ${info.count} 页打印页面，请在打印对话框中另存为 PDF。`;
+            }
+          }
+        } catch (error) {
+          hideExportOverlay();
+          console.warn("[Calendar] 导出失败：", error);
+          setExportStatus("error", "导出失败：" + (error && error.message ? error.message : "未知错误"));
+        } finally {
+          exportBusy = false;
+          btnExportRun.disabled = false;
+          refreshExportPanel();
+        }
+      }
+
+
+      function setExportRange(kind) {
+        exportRange = kind;
+        exportPanel.querySelectorAll("[data-range]").forEach((btn) => {
+          btn.setAttribute("aria-pressed", String(btn.dataset.range === kind));
+        });
+        exportStartWidget.close();
+        exportEndWidget.close();
+        exportCustom.hidden = kind !== "custom";
+        if (kind === "custom") {
+          const base = anchorDate();
+          if (!exportStart.value) exportStart.value = base;
+          if (!exportEnd.value) exportEnd.value = base;
+          exportStartWidget.setDate(exportStart.value, { silent: true });
+          exportEndWidget.setDate(exportEnd.value, { silent: true });
+        }
+        setExportStatus("", "");
+        refreshExportPanel();
+      }
+
+
+      // 面板锚定当前工具按钮；不依赖日历页的缩放比例或屏幕中心。
+      function positionDock(panel, button) {
+        const rect = button.getBoundingClientRect();
+        const vw = document.documentElement.clientWidth;
+        const vh = window.innerHeight;
+        let edge = Math.min(vw - 12, rect.left - 10);
+        let top = Math.max(12, Math.min(rect.top, vh - 100));
+        if (edge - 12 < 230) {
+          edge = vw - 12;
+          top = Math.max(12, Math.min(rect.bottom + 10, vh - 100));
+        }
+        panel.style.setProperty("--dock-right", `${vw - edge}px`);
+        panel.style.setProperty("--dock-top", `${top}px`);
+        panel.style.setProperty("--dock-width", `${Math.min(380, edge - 12)}px`);
+        panel.style.setProperty("--dock-height", `${Math.max(80, vh - top - 12)}px`);
+      }
+      const dockTimers = new WeakMap();
+      function showDock(panel, button) {
+        clearTimeout(dockTimers.get(panel));
+        positionDock(panel, button);
+        panel.hidden = false;
+        panel.inert = false;
+        void panel.offsetWidth; // 先应用收起尺寸，再触发两段式过渡。
+        panel.classList.add("is-open");
+        button.setAttribute("aria-expanded", "true");
+        dockTimers.set(panel, setTimeout(() => {
+          if (panel.classList.contains("is-open")) {
+            const target = panel.querySelector('.ldp-trigger, [data-range][aria-pressed="true"]');
+            if (target && !panel.contains(document.activeElement)) target.focus({ preventScroll: true });
+          }
+        }, motionPreference.matches ? 0 : 620));
+      }
+      function hideDock(panel, button, refocus, immediate) {
+        clearTimeout(dockTimers.get(panel));
+        const hadFocus = panel.contains(document.activeElement);
+        panel.classList.remove("is-open");
+        panel.inert = true;
+        button.setAttribute("aria-expanded", "false");
+        if (hadFocus && refocus) button.focus({ preventScroll: true });
+        if (immediate || motionPreference.matches) panel.hidden = true;
+        else dockTimers.set(panel, setTimeout(() => { panel.hidden = true; }, 440));
+      }
+      function openDatePanel() {
+        if (exportBusy) return;
+        closeExportPanel(false, true);
+        datePicker.value = anchorDate();
+        dateWidget.setDate(datePicker.value, { silent: true });
+        showDock(datePanel, btnDate);
+      }
+      function closeDatePanel(refocus, immediate) {
+        dateWidget.close();
+        hideDock(datePanel, btnDate, refocus, immediate);
+      }
+      function toggleDatePanel() {
+        if (!datePanel.classList.contains("is-open")) openDatePanel();
+        else closeDatePanel();
+      }
+
+      function openExportPanel() {
+        closeDatePanel(false, true);
+        const base = anchorDate();
+        exportStart.value = exportStart.value || base;
+        exportEnd.value = exportEnd.value || base;
+        showDock(exportPanel, btnExport);
+        setExportRange(exportRange);
+      }
+      function closeExportPanel(refocus, immediate) {
+        exportStartWidget.close();
+        exportEndWidget.close();
+        hideDock(exportPanel, btnExport, refocus, immediate);
+        setExportStatus("", "");
+      }
+      function toggleExportPanel() {
+        if (!exportPanel.classList.contains("is-open")) openExportPanel();
+        else closeExportPanel();
+      }
+      window.addEventListener("resize", () => {
+        if (datePanel.classList.contains("is-open")) positionDock(datePanel, btnDate);
+        if (exportPanel.classList.contains("is-open")) positionDock(exportPanel, btnExport);
+        // 等菜单定位更新后再校准日期浮层位置。
+        requestAnimationFrame(() => [dateWidget, exportStartWidget, exportEndWidget].forEach(widget => widget.reposition()));
+      });
+
+
+      function resize() {
+        if (["pending", "flip", "tear", "animating"].includes(state.mode)) cancelImmediately();
+        scale = $("book-space").getBoundingClientRect().width / SIZE.width;
+        book.style.transform = `scale(${scale})`;
+        pixelRatio = clamp((window.devicePixelRatio || 1) * scale, 0.5, 2);
+        renderer.resize(pixelRatio);
+        const rect = book.getBoundingClientRect();
+        tearView = {
+          left: Math.max(32, (rect.left + 32) / scale),
+          top: Math.max(32, (rect.top + 32) / scale),
+          width: (window.innerWidth + 64) / scale,
+          height: (window.innerHeight + 64) / scale,
+        };
+        tearCanvas.width = Math.ceil(tearView.width * pixelRatio);
+        tearCanvas.height = Math.ceil(tearView.height * pixelRatio);
+        Object.assign(tearCanvas.style, {
+          left: `${-tearView.left}px`,
+          top: `${-tearView.top}px`,
+          width: `${tearView.width}px`,
+          height: `${tearView.height}px`,
+        });
+        clearTear();
+      }
+
+      const onPaperPointerDown = (event) => {
+        if (event.target.closest("button") || event.isPrimary === false || event.button !== 0 || state.mode !== "idle") return;
+        const point = localPoint(event);
+
+        if (grabRollZone(point) && texStore.has(state.index) && texStore.has(state.index - 1)) {
+          event.preventDefault();
+          book.focus({ preventScroll: true });
+          state.pointer = event.pointerId;
+          state.down = { ...point };
+          state.last = { ...point, time: performance.now() };
+          state.grab = { rollBack: true };
+          state.velocity = { x: 0, y: 0 };
+          setMode("pending");
+          book.setPointerCapture(event.pointerId);
+          return;
+        }
+
+        if (state.index >= MAX_INDEX) return;
+        if (!texStore.has(state.index)) {
+
+          ensureTexture(state.index).catch(reportTextureError);
+          ensureTexture(state.index + 1).catch(reportTextureError);
+          return;
+        }
+        if (!texStore.has(state.index + 1)) {
+          ensureTexture(state.index + 1).catch(reportTextureError);
+          return;
+        }
+        const grab = grabZone(point);
+        if (!grab) return;
+        event.preventDefault();
+        book.focus({ preventScroll: true });
+        state.pointer = event.pointerId;
+        state.down = { ...point };
+        state.last = { ...point, time: performance.now() };
+        state.grab = grab;
+        state.velocity = { x: 0, y: 0 };
+        setMode("pending");
+        book.setPointerCapture(event.pointerId);
+      };
+      book.addEventListener("pointerdown", onPaperPointerDown);
+
+      document.addEventListener("pointerdown", (event) => {
+        if (event.target.closest("button, .book-tabs, .dock-panel, .export-overlay, #book")) return;
+        const rect = book.getBoundingClientRect();
+        const x = event.clientX - rect.left,
+          y = event.clientY - rect.top;
+        if (y <= rect.height || y > rect.height + 24 * scale || x < 0 || x > rect.width) return;
+        onPaperPointerDown(event);
+      });
+      book.addEventListener("pointermove", (event) => {
+        if (event.pointerId !== state.pointer) return;
+        event.preventDefault();
+        updatePointer(event);
+      });
+      book.addEventListener("pointerup", (event) => {
+        if (event.pointerId !== state.pointer) return;
+        updatePointer(event);
+        finishGesture(false);
+      });
+      book.addEventListener("pointercancel", (event) => {
+        if (event.pointerId === state.pointer) finishGesture(true);
+      });
+      book.addEventListener("lostpointercapture", (event) => {
+        if (event.pointerId === state.pointer) finishGesture(true);
+      });
+      window.addEventListener("blur", () => {
+        if (state.mode !== "idle" && state.pointer !== null) finishGesture(true);
+      });
+      document.addEventListener("visibilitychange", () => {
+        if (document.hidden && state.mode !== "idle") cancelImmediately();
+      });
+      book.addEventListener("keydown", (event) => {
+        if (event.target.closest("button")) return;
+        if (event.key === "Escape") {
+          event.preventDefault();
+          cancelImmediately();
+        } else if (["ArrowUp", "ArrowRight", " "].includes(event.key)) {
+          event.preventDefault();
+          if (!event.repeat) flipForward();
+        } else if (event.key === "ArrowLeft") {
+          event.preventDefault();
+          if (!event.repeat) flipBackward();
+        } else if (event.key.toLowerCase() === "t") {
+          event.preventDefault();
+          if (!event.repeat) tearOff();
+        } else if (event.key.toLowerCase() === "r") {
+          event.preventDefault();
+          goToday();
+        }
+      });
+
+      $("btn-next").addEventListener("click", flipForward);
+      $("btn-prev").addEventListener("click", flipBackward);
+
+      // 三处统一使用 LiteDatePicker；隐藏字段仅供现有跳转/导出逻辑读取。
+      function mountDatePicker(host, input) {
+        return new window.LiteDatePicker(host, {
+          date: input.value || dateOf(state.index),
+          minYear: +FIRST_DATE.slice(0, 4),
+          maxYear: +MAX_DATE.slice(0, 4),
+          onChange: (_date, value) => {
+            input.value = value;
+            input.dispatchEvent(new Event("change", { bubbles: true }));
+          },
+        });
+      }
+      datePicker.value = dateOf(state.index);
+      dateWidget = mountDatePicker("#date-picker-ui", datePicker);
+      exportStartWidget = mountDatePicker("#export-start-ui", exportStart);
+      exportEndWidget = mountDatePicker("#export-end-ui", exportEnd);
+      $("btn-date-go").addEventListener("click", () => {
+        const date = dateWidget.getValue();
+        closeDatePanel(true);
+        goToDate(date);
+      });
+      $("btn-date-close").addEventListener("click", () => closeDatePanel(true));
+      $("btn-export-close").addEventListener("click", () => {
+        if (!exportBusy) closeExportPanel(true);
+      });
+      $("btn-today").addEventListener("click", () => {
+        closeDatePanel();
+        goToday();
+      });
+      btnDate.addEventListener("click", toggleDatePanel);
+      datePanel.addEventListener("click", (event) => event.stopPropagation());
+
+
+      btnExport.addEventListener("click", (event) => {
+        event.stopPropagation();
+        toggleExportPanel();
+      });
+      exportPanel.addEventListener("click", (event) => event.stopPropagation());
+      exportPanel.querySelectorAll("[data-range]").forEach((btn) => {
+        btn.addEventListener("click", () => setExportRange(btn.dataset.range));
+      });
+      exportStart.addEventListener("change", () => {
+        setExportStatus("", "");
+        refreshExportPanel();
+      });
+      exportEnd.addEventListener("change", () => {
+        setExportStatus("", "");
+        refreshExportPanel();
+      });
+      btnExportRun.addEventListener("click", startExport);
+      btnExportCancel.addEventListener("click", () => {
+        exportCanceled = true;
+        exportOverlayProgress.textContent = "正在取消…";
+        btnExportCancel.disabled = true;
+      });
+
+      document.addEventListener("click", (event) => {
+        if (event.target.closest("#book-tabs, .dock-panel")) return;
+        closeDatePanel();
+        if (!exportBusy) closeExportPanel();
+      });
+      document.addEventListener("keydown", (event) => {
+        if (event.defaultPrevented) return;
+        if (event.key === "Escape") {
+          closeDatePanel(true);
+          if (!exportBusy) closeExportPanel(true);
+          return;
+        }
+        if (event.metaKey || event.ctrlKey || event.altKey || event.repeat) return;
+        const target = event.target;
+        if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT" || target.isContentEditable)) return;
+        if (event.key.toLowerCase() === "e") {
+          event.preventDefault();
+          toggleExportPanel();
+        }
+      });
+
+      if ("ResizeObserver" in window) new ResizeObserver(resize).observe($("book-space"));
+      window.addEventListener("resize", resize);
+
+
+      // Template loading is automatic; there are no template controls in book-tabs.
+      let artBusy = false;
+      async function initLibrary() {
+        artBusy = true;
+        try {
+          if (!window.CalendarArt) throw new Error("calendar-art.js 未加载");
+          window.CalendarArt.use(await window.CalendarArt.fetchDefault(), "calendar-templates.json");
+        } catch (error) {
+          console.warn("[Calendar Art] " + (error.message || "模板读取失败") + "；日期数字照常显示。");
+        } finally { artBusy = false; }
+      }
+      (async function init() {
+        const artReady = initLibrary();
+        const dailyTextReady = Promise.all([loadDailyText(), loadHolidayCouplets()]);
+        const fontsReady = loadIconFonts();
+
+        applyPrintPaper();
+        resize();
+        setMode("loading");
+        drawRoll();
+
+        await Promise.all([dailyTextReady, fontsReady, artReady]);
+        const todayData = almanac(TODAY_DATE);
+        syncCurrentDay(TODAY_INDEX, todayData);
+        applyStaticInkCenters(tpl);
+        applyInkCenter(tpl, "t-lun-bot", tpl, $("t-lun-bot").textContent.trim(), "lunar");
+        applyInkCenter(tpl, "t-wk-cn", tpl, $("t-wk-cn").textContent.trim(), "weekday");
+        await nextFrame();
+        await nextFrame();
+        await paintRestingPages();
+        if (state.mode === "loading" && actionVersion === 0) setMode("idle");
+      })().catch((error) => {
+        reportTextureError(error);
+        setMode("idle");
+        $("announcement").textContent = "日历加载失败，请刷新页面重试。";
+      });
+    })();
+  </script>
+</body>
+</html>
